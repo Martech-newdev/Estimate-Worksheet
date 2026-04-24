@@ -3548,9 +3548,22 @@ function generateQuote() {
           ]})
         ]
       });
-      var pageHeader = new D.Header({ children: [headerTable] });
-      // Empty header for pages 2+ (so the letterhead only appears on page 1)
-      var emptyHeader = new D.Header({ children: [new D.Paragraph({ children: [] })] });
+      // Word requires a paragraph after a table inside a header/footer; without it
+      // Word reports "unreadable content". Append a tiny (size 2) terminator paragraph.
+      // Use a non-empty text run so it produces a proper <w:t> element, not <w:r/>,
+      // which some Word versions reject during validation.
+      var headerTerminator = new D.Paragraph({
+        spacing: { after: 0, before: 0, line: 20 },
+        children: [new D.TextRun({ text: ' ', size: 2 })]
+      });
+      var pageHeader = new D.Header({ children: [headerTable, headerTerminator] });
+      // "Blank" header for pages 2+ — also needs a real text run so the run isn't empty.
+      var emptyHeader = new D.Header({
+        children: [new D.Paragraph({
+          spacing: { after: 0, line: 20 },
+          children: [new D.TextRun({ text: ' ', size: 2 })]
+        })]
+      });
 
       // ── Hyperlinks for footer (blue, underlined) ──
       var emailHyperlinkUL = new D.ExternalHyperlink({
