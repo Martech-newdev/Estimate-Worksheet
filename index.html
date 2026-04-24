@@ -590,14 +590,13 @@ function generateQuote() {
 
   // Read meta fields
   function gField(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; }
-  var qdate   = gField(p + '_qdate');
-  var cust    = gField(p + '_cust');
-  var contact = gField(p + '_contact');
-  var jobnum  = gField(p + '_jobnum');
-  var proj    = gField(p + '_proj');
-  var notes   = gField(p + '_notes');
-  // Note: estimator field is intentionally excluded from the customer-facing letter;
-  // the signature block is always the standard MarTech signatory (Ron Stephens).
+  var qdate     = gField(p + '_qdate');
+  var cust      = gField(p + '_cust');
+  var contact   = gField(p + '_contact');
+  var jobnum    = gField(p + '_jobnum');
+  var proj      = gField(p + '_proj');
+  var estimator = gField(p + '_estimator');
+  var notes     = gField(p + '_notes');
 
   // Read display totals
   function gText(id) { var el = document.getElementById(id); return el ? el.textContent.trim() : '$0.00'; }
@@ -732,9 +731,10 @@ function generateQuote() {
   ch.push(blank());
   ch.push(blank());
 
-  // Date + quote number
+  // Date + quote number + estimator (internal reference)
   ch.push(para([run('Date:\u00a0\u00a0' + (qdate || '___________'))]));
-  if (jobnum) ch.push(para([run('(Quote #' + jobnum + ')')], { spaceAfter: 80 }));
+  if (jobnum)    ch.push(para([run('Quote #' + jobnum)], { spaceAfter: 40 }));
+  if (estimator) ch.push(para([run('Prepared by:\u00a0\u00a0' + estimator)], { spaceAfter: 40 }));
   ch.push(blank());
 
   // Customer block
