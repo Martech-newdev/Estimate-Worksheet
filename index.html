@@ -604,25 +604,29 @@ function generateQuote() {
   var matTotal   = gText(p + '_s_mat');
   var grandTotal = gText(p + '_s_tot');
 
-  // Collect scope items from free rows
+  // Collect scope items from free rows (description filled OR hours/rate entered)
   var scopeItems = [];
   for (var i = 0; i < freeN; i++) {
     var descEl = document.getElementById(p + '_d_' + i);
     var hrsEl  = document.getElementById(p + '_h_' + i);
+    var rateEl = document.getElementById(p + '_r_' + i);
     var desc = descEl ? descEl.value.trim() : '';
     var hrs  = hrsEl  ? parseFloat(hrsEl.value) : 0;
-    if (desc || hrs > 0) scopeItems.push(desc || '(unlabeled task)');
+    var rate = rateEl ? parseFloat(rateEl.value) : 0;
+    if (desc || hrs > 0 || rate > 0) scopeItems.push(desc || '(unlabeled task)');
   }
-  // Fixed rows with hours entered
+  // Fixed rows included when hours OR rate is entered
   for (var f = 0; f < 8; f++) {
-    var hrsEl = document.getElementById(p + '_h_f' + f);
-    var hrs = hrsEl ? parseFloat(hrsEl.value) : 0;
-    if (hrs > 0 && FIXED_LABOR[f]) scopeItems.push(FIXED_LABOR[f]);
+    var hrsEl  = document.getElementById(p + '_h_f' + f);
+    var rateEl = document.getElementById(p + '_r_f' + f);
+    var hrs  = hrsEl  ? parseFloat(hrsEl.value) : 0;
+    var rate = rateEl ? parseFloat(rateEl.value) : 0;
+    if ((hrs > 0 || rate > 0) && FIXED_LABOR[f]) scopeItems.push(FIXED_LABOR[f]);
   }
 
   var rangeText = '';
-  if (scopeItems.length === 1) rangeText = 'work outlined in the 1.1 section of this proposal';
-  else if (scopeItems.length > 1) rangeText = 'work outlined in the 1.1 thru 1.' + scopeItems.length + ' section of this proposal';
+  if (scopeItems.length === 1) rangeText = 'work outlined in the 1.0 section of this proposal';
+  else if (scopeItems.length > 1) rangeText = 'work outlined in the 1.0 thru ' + scopeItems.length + '.0 section of this proposal';
 
   // Helpers
   var noBorder = { style: BS.NONE, size: 0, color: 'FFFFFF' };
@@ -641,10 +645,10 @@ function generateQuote() {
 
   function blank() { return new D.Paragraph({ children: [new D.TextRun('')], spacing: { after: 80 } }); }
 
-  // Scope item paragraphs
+  // Scope item paragraphs — numbered 1.0, 2.0, 3.0 … as user requested
   var scopeParas = [];
   for (var s = 0; s < scopeItems.length; s++) {
-    scopeParas.push(para([run('1.' + (s + 1) + '\u00a0\u00a0' + scopeItems[s])], { spaceAfter: 80 }));
+    scopeParas.push(para([run((s + 1) + '.0\u00a0\u00a0' + scopeItems[s])], { spaceAfter: 80 }));
   }
   if (scopeParas.length === 0) scopeParas.push(para('(No scope items entered)'));
 
@@ -659,26 +663,30 @@ function generateQuote() {
   }
   if (notesParas.length === 0) notesParas.push(para('(No notes entered)'));
 
-  // Cost table helper
-  function cellP(text, opts) {
-    opts = opts || {};
-    return new D.Paragraph({ alignment: opts.align || AT.LEFT, spacing: { after: 60 }, children: [run(text, opts)] });
-  }
-  function tcell(text, opts, width) {
+  // Cost table: left label column, right-aligned amount column
+  function tcellL(text, opts, width) {
     opts = opts || {};
     return new D.TableCell({
       borders: noBorders,
       width: { size: width || 50, type: WU.PERCENTAGE },
-      children: [cellP(text, opts)]
+      children: [new D.Paragraph({ alignment: AT.LEFT, spacing: { after: 60 }, children: [run(text, opts)] })]
+    });
+  }
+  function tcellR(text, opts, width) {
+    opts = opts || {};
+    return new D.TableCell({
+      borders: noBorders,
+      width: { size: width || 50, type: WU.PERCENTAGE },
+      children: [new D.Paragraph({ alignment: AT.RIGHT, spacing: { after: 60 }, children: [run(text, opts)] })]
     });
   }
 
   var costTable = new D.Table({
-    width: { size: 75, type: WU.PERCENTAGE },
+    width: { size: 80, type: WU.PERCENTAGE },
     borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder, insideH: noBorder, insideV: noBorder },
     rows: [
-      new D.TableRow({ children: [ tcell('Labor', {}, 40), tcell(labTotal, {}, 60) ] }),
-      new D.TableRow({ children: [ tcell('Parts', {}, 40), tcell(matTotal, {}, 60) ] }),
+      new D.TableRow({ children: [ tcellL('Labor', {}, 50), tcellR(labTotal, {}, 50) ] }),
+      new D.TableRow({ children: [ tcellL('Parts', {}, 50), tcellR(matTotal, {}, 50) ] }),
       new D.TableRow({ children: [
         new D.TableCell({
           borders: noBorders,
@@ -693,6 +701,30 @@ function generateQuote() {
 
   // Assemble document children
   var ch = [];
+
+  // ── MarTech Letterhead ──
+  ch.push(new D.Paragraph({
+    alignment: AT.LEFT,
+    spacing: { after: 40 },
+    children: [new D.TextRun({ text: 'MarTech', bold: true, size: 36, font: 'Calibri', color: '1a1a1a' })]
+  }));
+  ch.push(new D.Paragraph({
+    alignment: AT.LEFT,
+    spacing: { after: 40 },
+    children: [new D.TextRun({ text: 'Mechanical Analysis and Repair', size: 22, font: 'Calibri', color: '444444' })]
+  }));
+  ch.push(new D.Paragraph({
+    alignment: AT.LEFT,
+    spacing: { after: 40 },
+    children: [new D.TextRun({ text: 'Lodi, CA', size: 22, font: 'Calibri', color: '444444' })]
+  }));
+  ch.push(new D.Paragraph({
+    alignment: AT.LEFT,
+    spacing: { after: 40 },
+    children: [new D.TextRun({ text: '(209) 333-8478 \u00a0|\u00a0 Rons@mar-tech.com', size: 20, font: 'Calibri', color: '444444' })]
+  }));
+  ch.push(blank());
+  ch.push(blank());
 
   // Date + quote number
   ch.push(para([run(qdate || 'Date: ___________')]));
