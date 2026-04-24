@@ -605,6 +605,7 @@ function generateQuote() {
   var grandTotal = gText(p + '_s_tot');
 
   // Collect scope items from free rows (description filled OR hours/rate entered)
+  // Each entry stores { num: rowLabel, text: description }
   var scopeItems = [];
   for (var i = 0; i < freeN; i++) {
     var descEl = document.getElementById(p + '_d_' + i);
@@ -613,20 +614,25 @@ function generateQuote() {
     var desc = descEl ? descEl.value.trim() : '';
     var hrs  = hrsEl  ? parseFloat(hrsEl.value) : 0;
     var rate = rateEl ? parseFloat(rateEl.value) : 0;
-    if (desc || hrs > 0 || rate > 0) scopeItems.push(desc || '(unlabeled task)');
+    if (desc || hrs > 0 || rate > 0) scopeItems.push({ num: (i + 1) + '.0', text: desc || '(unlabeled task)' });
   }
-  // Fixed rows included when hours OR rate is entered
+  // Fixed rows included when hours OR rate is entered — numbered after free rows
   for (var f = 0; f < 8; f++) {
     var hrsEl  = document.getElementById(p + '_h_f' + f);
     var rateEl = document.getElementById(p + '_r_f' + f);
     var hrs  = hrsEl  ? parseFloat(hrsEl.value) : 0;
     var rate = rateEl ? parseFloat(rateEl.value) : 0;
-    if ((hrs > 0 || rate > 0) && FIXED_LABOR[f]) scopeItems.push(FIXED_LABOR[f]);
+    if ((hrs > 0 || rate > 0) && FIXED_LABOR[f]) {
+      scopeItems.push({ num: (freeN + f + 1) + '.0', text: FIXED_LABOR[f] });
+    }
   }
 
   var rangeText = '';
-  if (scopeItems.length === 1) rangeText = 'work outlined in the 1.0 section of this proposal';
-  else if (scopeItems.length > 1) rangeText = 'work outlined in the 1.0 thru ' + scopeItems.length + '.0 section of this proposal';
+  if (scopeItems.length === 1) {
+    rangeText = 'work outlined in the ' + scopeItems[0].num + ' section of this proposal';
+  } else if (scopeItems.length > 1) {
+    rangeText = 'work outlined in the ' + scopeItems[0].num + ' thru ' + scopeItems[scopeItems.length - 1].num + ' section of this proposal';
+  }
 
   // Helpers
   var noBorder = { style: BS.NONE, size: 0, color: 'FFFFFF' };
@@ -645,10 +651,11 @@ function generateQuote() {
 
   function blank() { return new D.Paragraph({ children: [new D.TextRun('')], spacing: { after: 80 } }); }
 
-  // Scope item paragraphs — numbered 1.0, 2.0, 3.0 … as user requested
+  // Scope item paragraphs — prefixed with actual worksheet row number (e.g. 3.0, 7.0)
   var scopeParas = [];
   for (var s = 0; s < scopeItems.length; s++) {
-    scopeParas.push(para([run((s + 1) + '.0\u00a0\u00a0' + scopeItems[s])], { spaceAfter: 80 }));
+    var item = scopeItems[s];
+    scopeParas.push(para([run(item.num + '\u00a0\u00a0' + item.text)], { spaceAfter: 80 }));
   }
   if (scopeParas.length === 0) scopeParas.push(para('(No scope items entered)'));
 
