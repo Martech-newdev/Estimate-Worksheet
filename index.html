@@ -3378,24 +3378,34 @@ function generateQuote() {
     });
   }
 
-  // Two-column borderless cell builder for footer layout
-  function footCell(text, align, opts) {
-    opts = opts || {};
+  // Borderless cell builder taking pre-built paragraphs
+  function cellOf(paragraphs, widthPct, align) {
     return new D.TableCell({
       borders: noBorders,
-      width: { size: 50, type: WU.PERCENTAGE },
-      children: [new D.Paragraph({
-        alignment: align,
-        spacing: { after: 40 },
-        children: [new D.TextRun({
-          text: text,
-          bold: opts.bold || false,
-          italics: opts.italics || false,
-          size: opts.size || 18,
-          font: 'Calibri',
-          color: opts.color || '444444'
-        })]
-      })]
+      width: { size: widthPct, type: WU.PERCENTAGE },
+      verticalAlign: align || D.VerticalAlign.TOP,
+      children: paragraphs
+    });
+  }
+
+  // Footer text run (slightly tracked, light gray)
+  function footRun(text, opts) {
+    opts = opts || {};
+    return new D.TextRun({
+      text: text,
+      bold: opts.bold || false,
+      italics: opts.italics || false,
+      size: opts.size || 18,
+      font: 'Calibri',
+      color: opts.color || '555555',
+      characterSpacing: opts.characterSpacing !== undefined ? opts.characterSpacing : 10
+    });
+  }
+  function footPara(children, align) {
+    return new D.Paragraph({
+      alignment: align,
+      spacing: { after: 60 },
+      children: children
     });
   }
 
@@ -3406,18 +3416,62 @@ function generateQuote() {
       return r.arrayBuffer();
     })
     .then(function(logoBuf) {
-      // ── Page header (repeats on every page): MarTech logo image ──
-      var pageHeader = new D.Header({
+      // ── Page header (FIRST PAGE ONLY): letterhead text left, logo image right ──
+      var headerLeftPara1 = new D.Paragraph({
+        alignment: AT.LEFT,
+        spacing: { after: 60 },
         children: [
-          new D.Paragraph({
-            alignment: AT.LEFT,
-            spacing: { after: 80 },
-            children: [new D.ImageRun({
-              data: logoBuf,
-              transformation: { width: 70, height: 142 }
-            })]
-          })
+          new D.TextRun({ text: 'MarTech', bold: true, size: 32, font: 'Calibri', color: '1a1a1a' }),
+          new D.TextRun({ text: ' - Mechanical Analysis and Repair', size: 24, font: 'Calibri', color: '1a1a1a' })
         ]
+      });
+      var headerLeftPara2 = new D.Paragraph({
+        alignment: AT.LEFT,
+        spacing: { after: 0 },
+        children: [
+          new D.TextRun({ text: 'Lodi, CA  (209) 333-8478\u00a0|\u00a0Rons@mar-tech.com', size: 20, font: 'Calibri', color: '444444' })
+        ]
+      });
+      var headerImagePara = new D.Paragraph({
+        alignment: AT.RIGHT,
+        spacing: { after: 0 },
+        children: [new D.ImageRun({
+          data: logoBuf,
+          transformation: { width: 90, height: 182 }
+        })]
+      });
+      var headerTable = new D.Table({
+        width: { size: 100, type: WU.PERCENTAGE },
+        borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder, insideH: noBorder, insideV: noBorder },
+        rows: [
+          new D.TableRow({ children: [
+            cellOf([headerLeftPara1, headerLeftPara2], 70, D.VerticalAlign.TOP),
+            cellOf([headerImagePara], 30, D.VerticalAlign.TOP)
+          ]})
+        ]
+      });
+      var pageHeader = new D.Header({ children: [headerTable] });
+      // Empty header for pages 2+ (so the letterhead only appears on page 1)
+      var emptyHeader = new D.Header({ children: [new D.Paragraph({ children: [] })] });
+
+      // ── Hyperlinks for footer (blue, underlined) ──
+      var emailHyperlinkUL = new D.ExternalHyperlink({
+        link: 'mailto:martech@mar-tech.com',
+        children: [new D.TextRun({
+          text: 'martech@mar-tech.com',
+          size: 18, font: 'Calibri', color: '0563C1',
+          underline: { type: 'single', color: '0563C1' },
+          characterSpacing: 10
+        })]
+      });
+      var webHyperlinkUL = new D.ExternalHyperlink({
+        link: 'http://www.mar-tech.com',
+        children: [new D.TextRun({
+          text: 'www.mar-tech.com',
+          size: 18, font: 'Calibri', color: '0563C1',
+          underline: { type: 'single', color: '0563C1' },
+          characterSpacing: 10
+        })]
       });
 
       // ── Page footer (repeats on every page): company info layout ──
@@ -3426,12 +3480,12 @@ function generateQuote() {
         borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder, insideH: noBorder, insideV: noBorder },
         rows: [
           new D.TableRow({ children: [
-            footCell('142 North Cluff Avenue, Lodi, California 95240', AT.LEFT),
-            footCell('Tel: 209.333.8478;  Fax: 209.333.8479', AT.RIGHT)
+            cellOf([footPara([footRun('142 North Cluff Avenue, Lodi, California 95240')], AT.LEFT)], 50),
+            cellOf([footPara([footRun('Tel: 209.333.8478;  Fax: 209.333.8479')], AT.RIGHT)], 50)
           ]}),
           new D.TableRow({ children: [
-            footCell('email: martech@mar-tech.com', AT.LEFT),
-            footCell('website: www.mar-tech.com', AT.RIGHT)
+            cellOf([footPara([footRun('email: '), emailHyperlinkUL], AT.LEFT)], 50),
+            cellOf([footPara([footRun('website: '), webHyperlinkUL], AT.RIGHT)], 50)
           ]})
         ]
       });
@@ -3444,17 +3498,22 @@ function generateQuote() {
             children: [new D.TextRun('')]
           }),
           footerLineTable,
-          infoLine('Contactor License: 684442', { align: AT.CENTER, italics: true, spaceAfter: 0 })
+          new D.Paragraph({
+            alignment: AT.CENTER,
+            spacing: { after: 0 },
+            children: [footRun('Contactor License: 684442', { italics: true })]
+          })
         ]
       });
 
       var doc = new D.Document({
         sections: [{
           properties: {
-            page: { margin: { top: 2160, right: 1080, bottom: 2160, left: 1080 } }
+            page: { margin: { top: 1440, right: 1080, bottom: 2160, left: 1080 } },
+            titlePage: true   // enables a different (full) header on page 1 vs pages 2+
           },
-          headers: { default: pageHeader },
-          footers: { default: pageFooter },
+          headers: { default: emptyHeader, first: pageHeader },
+          footers: { default: pageFooter, first: pageFooter },
           children: ch
         }]
       });
