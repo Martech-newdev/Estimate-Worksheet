@@ -919,6 +919,24 @@ function _resolveJobnumTemplate(tpl, counterOverride) {
   return s;
 }
 
+function _findUnknownJobnumTokens(tpl) {
+  if (!tpl) return [];
+  var known = { '{YYYY}': 1, '{YY}': 1, '{MM}': 1, '{DD}': 1 };
+  var seen = {};
+  var unknown = [];
+  var re = /\{[^{}]*\}/g;
+  var m;
+  while ((m = re.exec(tpl)) !== null) {
+    var tok = m[0];
+    if (known[tok]) continue;
+    if (/^\{#+\}$/.test(tok)) continue;
+    if (seen[tok]) continue;
+    seen[tok] = 1;
+    unknown.push(tok);
+  }
+  return unknown;
+}
+
 function _updateJobnumPreview() {
   var prev = document.getElementById('def_jobnum_preview');
   if (!prev) return;
@@ -928,11 +946,20 @@ function _updateJobnumPreview() {
   if (!tpl) {
     prev.style.display = 'none';
     prev.textContent = '';
+    prev.style.color = '#1a5fb4';
     return;
   }
   var c = ctrEl ? parseInt(ctrEl.value, 10) : NaN;
   if (isNaN(c) || c < 1) c = _readCounter();
-  prev.textContent = 'Preview: ' + _resolveJobnumTemplate(tpl, c);
+  var resolved = _resolveJobnumTemplate(tpl, c);
+  var unknown = _findUnknownJobnumTokens(tpl);
+  if (unknown.length) {
+    prev.style.color = '#c64600';
+    prev.textContent = 'Preview: ' + resolved + '  \u2014  Unknown token' + (unknown.length > 1 ? 's' : '') + ': ' + unknown.join(', ');
+  } else {
+    prev.style.color = '#1a5fb4';
+    prev.textContent = 'Preview: ' + resolved;
+  }
   prev.style.display = '';
 }
 
