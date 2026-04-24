@@ -233,6 +233,7 @@
     <div class="meta-row"><span class="meta-label">Address Line 1:</span><input class="meta-input" type="text" id="a_addr1"></div>
     <div class="meta-row"><span class="meta-label">City/State/Zip:</span><input class="meta-input" type="text" id="a_addr2"></div>
     <div class="meta-row"><span class="meta-label">Contact:</span><input class="meta-input" type="text" id="a_contact"></div>
+    <div class="meta-row"><span class="meta-label">Contact Email:</span><input class="meta-input" type="email" id="a_contact_email"></div>
     <div class="meta-row"><span class="meta-label">Job Number:</span><input class="meta-input" type="text" id="a_jobnum"></div>
     <div class="meta-row"><span class="meta-label">Project Name:</span><input class="meta-input" type="text" id="a_proj"></div>
     <div class="meta-row"><span class="meta-label">Date In:</span><input class="meta-input" type="text" id="a_datein" placeholder="MM/DD/YYYY"></div>
@@ -321,6 +322,7 @@
     <div class="meta-row"><span class="meta-label">Address Line 1:</span><input class="meta-input" type="text" id="b_addr1"></div>
     <div class="meta-row"><span class="meta-label">City/State/Zip:</span><input class="meta-input" type="text" id="b_addr2"></div>
     <div class="meta-row"><span class="meta-label">Contact:</span><input class="meta-input" type="text" id="b_contact"></div>
+    <div class="meta-row"><span class="meta-label">Contact Email:</span><input class="meta-input" type="email" id="b_contact_email"></div>
     <div class="meta-row"><span class="meta-label">Job Number:</span><input class="meta-input" type="text" id="b_jobnum"></div>
     <div class="meta-row"><span class="meta-label">Project Name:</span><input class="meta-input" type="text" id="b_proj"></div>
     <div class="meta-row"><span class="meta-label">Date In:</span><input class="meta-input" type="text" id="b_datein" placeholder="MM/DD/YYYY"></div>
@@ -714,6 +716,7 @@ function generateQuote() {
   var addr1     = gField(p + '_addr1');
   var addr2     = gField(p + '_addr2');
   var contact   = gField(p + '_contact');
+  var contactEmail = gField(p + '_contact_email');
   var jobnum    = gField(p + '_jobnum');
   var proj      = gField(p + '_proj');
   var estimator = gField(p + '_estimator');
@@ -865,7 +868,8 @@ function generateQuote() {
   ch.push(blank());
 
   // Attention
-  ch.push(para([run('Attention:\u00a0\u00a0' + (contact || '___________'))]));
+  var attentionText = contact ? (contactEmail ? contact + ' <' + contactEmail + '>' : contact) : '___________';
+  ch.push(para([run('Attention:\u00a0\u00a0' + attentionText)]));
   ch.push(blank());
 
   // Subject
