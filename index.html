@@ -214,7 +214,10 @@
   <span style="display:inline-block;width:1px;height:24px;background:#aaa;"></span>
   <button class="btn btn-green" onclick="generateQuote()">&#128196; Generate Word Quote</button>
   <button class="btn btn-red"  onclick="window.print()">&#128424; Print / Save PDF</button>
+  <button class="btn btn-blue" onclick="exportToFile()">&#128190; Save to File</button>
+  <button class="btn btn-blue" onclick="document.getElementById('importFile').click()">&#128194; Load from File</button>
   <button class="btn btn-dark" onclick="clearForm()">&#8635; Clear Form</button>
+  <input type="file" id="importFile" accept=".json,application/json" style="display:none" onchange="importFromFile(event)">
 </div>
 
 <!-- ===== 1-PAGE ===== -->
@@ -396,6 +399,8 @@
 <div class="controls" style="margin-top:14px;">
   <button class="btn btn-green" onclick="generateQuote()">&#128196; Generate Word Quote</button>
   <button class="btn btn-red"  onclick="window.print()">&#128424; Print / Save PDF</button>
+  <button class="btn btn-blue" onclick="exportToFile()">&#128190; Save to File</button>
+  <button class="btn btn-blue" onclick="document.getElementById('importFile').click()">&#128194; Load from File</button>
   <button class="btn btn-dark" onclick="clearForm()">&#8635; Clear Form</button>
 </div>
 
@@ -573,17 +578,85 @@ function clearForm() {
 var STORAGE_KEY = 'martech_worksheet_v1';
 var _saveTimer = null;
 
+function collectFormData() {
+  var data = {};
+  var els = document.querySelectorAll('input[id], textarea[id], select[id]');
+  for (var i = 0; i < els.length; i++) {
+    var el = els[i];
+    if (el.type === 'button' || el.type === 'submit' || el.type === 'file') continue;
+    data[el.id] = el.value;
+  }
+  return data;
+}
+
+function applyFormData(data) {
+  if (!data) return;
+  for (var id in data) {
+    if (!Object.prototype.hasOwnProperty.call(data, id)) continue;
+    var el = document.getElementById(id);
+    if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')) {
+      el.value = data[id];
+    }
+  }
+  recalcAll('a', 18);
+  recalcAll('b', 63);
+}
+
 function saveForm() {
   try {
-    var data = {};
-    var els = document.querySelectorAll('input[id], textarea[id], select[id]');
-    for (var i = 0; i < els.length; i++) {
-      var el = els[i];
-      if (el.type === 'button' || el.type === 'submit') continue;
-      data[el.id] = el.value;
-    }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(collectFormData()));
   } catch (e) { /* storage unavailable — silently ignore */ }
+}
+
+function exportToFile() {
+  var data = collectFormData();
+  var jobnum = (data['a_jobnum'] || data['b_jobnum'] || '').trim();
+  var cust = (data['a_cust'] || data['b_cust'] || '').trim();
+  var slug = (jobnum + (jobnum && cust ? '_' : '') + cust).replace(/[^A-Za-z0-9_\-]+/g, '_') || 'worksheet';
+  var payload = { app: 'martech_worksheet', version: 1, exportedAt: new Date().toISOString(), data: data };
+  var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'Worksheet_' + slug + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function() { URL.revokeObjectURL(url); }, 0);
+}
+
+function importFromFile(ev) {
+  var input = ev.target;
+  var file = input.files && input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function() {
+    try {
+      var parsed = JSON.parse(reader.result);
+      var data = (parsed && parsed.data && typeof parsed.data === 'object') ? parsed.data : parsed;
+      if (!data || typeof data !== 'object') throw new Error('bad format');
+      if (!confirm('Load this worksheet? This will overwrite the current data on both tabs.')) {
+        input.value = '';
+        return;
+      }
+      var els = document.querySelectorAll('input[id], textarea[id], select[id]');
+      for (var i = 0; i < els.length; i++) {
+        var el = els[i];
+        if (el.type === 'button' || el.type === 'submit' || el.type === 'file') continue;
+        if (el.tagName === 'SELECT') { el.selectedIndex = 0; } else { el.value = ''; }
+      }
+      applyFormData(data);
+      saveForm();
+    } catch (e) {
+      alert('Could not load file — it does not look like a valid worksheet export.');
+    }
+    input.value = '';
+  };
+  reader.onerror = function() {
+    alert('Could not read the selected file.');
+    input.value = '';
+  };
+  reader.readAsText(file);
 }
 
 function scheduleSave() {
@@ -595,17 +668,7 @@ function restoreForm() {
   try {
     var raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return;
-    var data = JSON.parse(raw);
-    if (!data) return;
-    for (var id in data) {
-      if (!Object.prototype.hasOwnProperty.call(data, id)) continue;
-      var el = document.getElementById(id);
-      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')) {
-        el.value = data[id];
-      }
-    }
-    recalcAll('a', 18);
-    recalcAll('b', 63);
+    applyFormData(JSON.parse(raw));
   } catch (e) { /* corrupt storage — ignore */ }
 }
 
