@@ -9,6 +9,19 @@ Single-page tool for creating professional job estimates with:
 - Real-time labor and material cost calculations
 - Customizable markup rates
 - Print-ready layout for PDF export or physical printing
+- A worksheet library: save the current worksheet under a name and switch
+  between saved jobs without losing in-progress work. Browser auto-save still
+  protects the unsaved active worksheet between visits.
+
+## Storage
+
+- `localStorage["martech_worksheet_v1"]` — auto-saved snapshot of the
+  currently-open (active) worksheet. Restored on page load.
+- `localStorage["martech_worksheets_v1"]` — named worksheet library:
+  `{ current: name|null, items: { name: { data, savedAt } } }`. Updated
+  explicitly via the picker's Save / Save As / Delete buttons. Switching to a
+  saved worksheet asks for confirmation if the active worksheet has unsaved
+  changes relative to its baseline.
 
 ## Tech Stack
 

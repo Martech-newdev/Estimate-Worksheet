@@ -44,6 +44,23 @@
   }
   .save-status.flash { background: #d4edda; color: #1e8449; }
   .save-status.warn  { background: #f8d7da; color: #b02a37; }
+  .save-status.dirty { background: #fff3cd; color: #8a6d3b; }
+
+  .ws-picker {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 8px; background: #eee; border-radius: 3px;
+    font-family: 'Barlow Condensed', sans-serif;
+  }
+  .ws-picker label {
+    font-size: 12px; font-weight: 700; letter-spacing: 0.5px;
+    text-transform: uppercase; color: #555;
+  }
+  .ws-picker select {
+    font-family: 'Barlow', sans-serif; font-size: 13px;
+    padding: 5px 6px; border: 1px solid #aaa; border-radius: 3px;
+    background: #fff; min-width: 170px; max-width: 240px;
+  }
+  .ws-picker .btn { padding: 6px 12px; font-size: 12px; }
 
   .form-card {
     background: #f4f4f2;
@@ -231,6 +248,16 @@
   <button class="btn btn-dark" onclick="clearForm()">&#8635; Clear Form</button>
   <input type="file" id="importFile" accept=".json,application/json" style="display:none" onchange="importFromFile(event)">
   <span id="saveStatus" class="save-status" aria-live="polite">Not saved yet</span>
+</div>
+
+<div class="controls">
+  <div class="ws-picker">
+    <label for="wsPicker">Worksheet:</label>
+    <select id="wsPicker" onchange="onPickerChange(this)"></select>
+    <button class="btn btn-green" onclick="saveCurrentWorksheet()" title="Save under current name">&#128190; Save</button>
+    <button class="btn btn-blue"  onclick="saveWorksheetAs()" title="Save current worksheet under a new name">&#128221; Save As&hellip;</button>
+    <button class="btn btn-dark"  onclick="deleteCurrentWorksheet()" title="Delete the selected saved worksheet">&#128465; Delete</button>
+  </div>
 </div>
 
 <!-- ===== 1-PAGE ===== -->
@@ -586,7 +613,13 @@ function clearForm() {
   for (var i = 0; i < svs.length; i++) {
     svs[i].innerHTML = svs[i].id && svs[i].id.indexOf('_s_hrs') > -1 ? '0' : '$0.00';
   }
+  _currentWorksheetName = null;
+  _baselineSnapshot = null;
+  var lib = _readLibrary();
+  if (lib.current) { lib.current = null; _writeLibrary(lib); }
   saveForm();
+  if (typeof refreshWorksheetPicker === 'function') refreshWorksheetPicker();
+  if (typeof refreshDirtyIndicator === 'function') refreshDirtyIndicator();
 }
 
 // ── Auto-save / restore worksheet data via localStorage ──
@@ -643,6 +676,7 @@ function collectFormData() {
   for (var i = 0; i < els.length; i++) {
     var el = els[i];
     if (el.type === 'button' || el.type === 'submit' || el.type === 'file') continue;
+    if (el.id === 'wsPicker' || el.id === 'importFile') continue;
     data[el.id] = el.value;
   }
   return data;
@@ -711,7 +745,13 @@ function importFromFile(ev) {
         if (el.tagName === 'SELECT') { el.selectedIndex = 0; } else { el.value = ''; }
       }
       applyFormData(data);
+      _currentWorksheetName = null;
+      _baselineSnapshot = null;
+      var lib = _readLibrary();
+      if (lib.current) { lib.current = null; _writeLibrary(lib); }
       saveForm();
+      refreshWorksheetPicker();
+      refreshDirtyIndicator();
     } catch (e) {
       alert('Could not load file — it does not look like a valid worksheet export.');
     }
@@ -726,7 +766,7 @@ function importFromFile(ev) {
 
 function scheduleSave() {
   if (_saveTimer) clearTimeout(_saveTimer);
-  _saveTimer = setTimeout(saveForm, 250);
+  _saveTimer = setTimeout(function() { saveForm(); refreshDirtyIndicator(); }, 250);
 }
 
 function restoreForm() {
@@ -737,13 +777,184 @@ function restoreForm() {
   } catch (e) { /* corrupt storage — ignore */ }
 }
 
+// ── Worksheet library: save / load multiple named worksheets ──
+var LIBRARY_KEY = 'martech_worksheets_v1';
+var _currentWorksheetName = null;
+var _baselineSnapshot = null; // JSON string of data at last load/save of named worksheet
+
+function _readLibrary() {
+  if (!_storageAvailable) return { current: null, items: {} };
+  try {
+    var raw = localStorage.getItem(LIBRARY_KEY);
+    if (!raw) return { current: null, items: {} };
+    var lib = JSON.parse(raw);
+    if (!lib || typeof lib !== 'object') return { current: null, items: {} };
+    if (!lib.items || typeof lib.items !== 'object') lib.items = {};
+    return lib;
+  } catch (e) { return { current: null, items: {} }; }
+}
+
+function _writeLibrary(lib) {
+  if (!_storageAvailable) return false;
+  try { localStorage.setItem(LIBRARY_KEY, JSON.stringify(lib)); return true; }
+  catch (e) { alert('Could not save — browser storage is full or unavailable.'); return false; }
+}
+
+function _snapshotString() { return JSON.stringify(collectFormData()); }
+
+function isWorksheetDirty() {
+  if (_baselineSnapshot == null) return false;
+  return _snapshotString() !== _baselineSnapshot;
+}
+
+function refreshDirtyIndicator() {
+  var el = document.getElementById('saveStatus');
+  if (!el || !_storageAvailable) return;
+  if (_currentWorksheetName && isWorksheetDirty()) {
+    el.classList.add('dirty');
+    el.textContent = 'Unsaved changes in "' + _currentWorksheetName + '"';
+  } else {
+    el.classList.remove('dirty');
+    updateSaveStatus(false);
+  }
+}
+
+function refreshWorksheetPicker() {
+  var sel = document.getElementById('wsPicker');
+  if (!sel) return;
+  var lib = _readLibrary();
+  var names = Object.keys(lib.items).sort(function(a, b) {
+    return a.toLowerCase().localeCompare(b.toLowerCase());
+  });
+  var html = '';
+  if (_currentWorksheetName && lib.items[_currentWorksheetName]) {
+    // current named worksheet will appear in the list below
+    html += '<option value="">— Switch to —</option>';
+  } else {
+    html += '<option value="">(Unsaved worksheet)</option>';
+  }
+  for (var i = 0; i < names.length; i++) {
+    var n = names[i];
+    var label = n + (n === _currentWorksheetName ? '  •' : '');
+    html += '<option value="' + _escAttr(n) + '"' + (n === _currentWorksheetName ? ' selected' : '') + '>' + _escHtml(label) + '</option>';
+  }
+  sel.innerHTML = html;
+}
+
+function _escAttr(s) { return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;'); }
+function _escHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+function onPickerChange(sel) {
+  var name = sel.value;
+  if (!name) { refreshWorksheetPicker(); return; }
+  if (name === _currentWorksheetName) { refreshWorksheetPicker(); return; }
+  loadWorksheetByName(name);
+}
+
+function loadWorksheetByName(name) {
+  var lib = _readLibrary();
+  var entry = lib.items[name];
+  if (!entry) { alert('That worksheet no longer exists.'); refreshWorksheetPicker(); return; }
+  if (isWorksheetDirty() || (_currentWorksheetName == null && _hasAnyData())) {
+    var msg = _currentWorksheetName
+      ? 'You have unsaved changes in "' + _currentWorksheetName + '". Discard them and load "' + name + '"?'
+      : 'The current worksheet has not been saved to your library. Discard it and load "' + name + '"?';
+    if (!confirm(msg)) { refreshWorksheetPicker(); return; }
+  }
+  // Wipe all fields then apply
+  var els = document.querySelectorAll('input[id], textarea[id], select[id]');
+  for (var i = 0; i < els.length; i++) {
+    var el = els[i];
+    if (el.type === 'button' || el.type === 'submit' || el.type === 'file') continue;
+    if (el.tagName === 'SELECT') { el.selectedIndex = 0; } else { el.value = ''; }
+  }
+  applyFormData(entry.data || {});
+  _currentWorksheetName = name;
+  lib.current = name;
+  _writeLibrary(lib);
+  _baselineSnapshot = _snapshotString();
+  saveForm();
+  refreshWorksheetPicker();
+  refreshDirtyIndicator();
+}
+
+function _hasAnyData() {
+  var d = collectFormData();
+  for (var k in d) {
+    if (!Object.prototype.hasOwnProperty.call(d, k)) continue;
+    if (d[k] && String(d[k]).trim() !== '') return true;
+  }
+  return false;
+}
+
+function saveCurrentWorksheet() {
+  if (!_storageAvailable) { alert('Browser storage is unavailable — use Save to File instead.'); return; }
+  if (!_currentWorksheetName) { saveWorksheetAs(); return; }
+  var lib = _readLibrary();
+  lib.items[_currentWorksheetName] = { data: collectFormData(), savedAt: new Date().toISOString() };
+  lib.current = _currentWorksheetName;
+  if (!_writeLibrary(lib)) return;
+  _baselineSnapshot = _snapshotString();
+  refreshWorksheetPicker();
+  refreshDirtyIndicator();
+}
+
+function saveWorksheetAs() {
+  if (!_storageAvailable) { alert('Browser storage is unavailable — use Save to File instead.'); return; }
+  var suggested = _currentWorksheetName || _suggestWorksheetName();
+  var name = prompt('Save worksheet as:', suggested);
+  if (name == null) return;
+  name = name.trim();
+  if (!name) { alert('Please enter a name.'); return; }
+  if (name.length > 80) { alert('Name is too long (max 80 characters).'); return; }
+  var lib = _readLibrary();
+  if (lib.items[name] && name !== _currentWorksheetName) {
+    if (!confirm('A worksheet named "' + name + '" already exists. Overwrite it?')) return;
+  }
+  lib.items[name] = { data: collectFormData(), savedAt: new Date().toISOString() };
+  lib.current = name;
+  if (!_writeLibrary(lib)) return;
+  _currentWorksheetName = name;
+  _baselineSnapshot = _snapshotString();
+  refreshWorksheetPicker();
+  refreshDirtyIndicator();
+}
+
+function _suggestWorksheetName() {
+  var d = collectFormData();
+  var jobnum = (d['a_jobnum'] || d['b_jobnum'] || '').trim();
+  var cust = (d['a_cust'] || d['b_cust'] || '').trim();
+  var proj = (d['a_proj'] || d['b_proj'] || '').trim();
+  var parts = [];
+  if (jobnum) parts.push(jobnum);
+  if (cust) parts.push(cust);
+  else if (proj) parts.push(proj);
+  return parts.join(' — ') || '';
+}
+
+function deleteCurrentWorksheet() {
+  if (!_currentWorksheetName) {
+    alert('No saved worksheet is currently loaded. Pick one from the dropdown first.');
+    return;
+  }
+  if (!confirm('Delete saved worksheet "' + _currentWorksheetName + '" from your library? The worksheet currently on screen will stay until you reload or clear it.')) return;
+  var lib = _readLibrary();
+  delete lib.items[_currentWorksheetName];
+  if (lib.current === _currentWorksheetName) lib.current = null;
+  _writeLibrary(lib);
+  _currentWorksheetName = null;
+  _baselineSnapshot = null;
+  refreshWorksheetPicker();
+  refreshDirtyIndicator();
+}
+
 document.addEventListener('input', function(e) {
   var t = e.target;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) scheduleSave();
 });
 document.addEventListener('change', function(e) {
   var t = e.target;
-  if (t && t.tagName === 'SELECT') scheduleSave();
+  if (t && t.tagName === 'SELECT' && t.id !== 'wsPicker') scheduleSave();
 });
 
 window.onload = function() {
@@ -752,8 +963,19 @@ window.onload = function() {
   var pages = document.getElementsByClassName('tab-page');
   for (var i = 0; i < pages.length; i++) pages[i].style.display = i === 0 ? 'block' : 'none';
   restoreForm();
+  // Restore "current named worksheet" pointer (if the auto-saved data still matches it).
+  var lib = _readLibrary();
+  if (lib.current && lib.items[lib.current]) {
+    var savedSnap = JSON.stringify(lib.items[lib.current].data || {});
+    if (savedSnap === _snapshotString()) {
+      _currentWorksheetName = lib.current;
+      _baselineSnapshot = savedSnap;
+    }
+  }
+  refreshWorksheetPicker();
   updateSaveStatus(false);
-  setInterval(function() { updateSaveStatus(false); }, 15000);
+  refreshDirtyIndicator();
+  setInterval(function() { if (!(_currentWorksheetName && isWorksheetDirty())) updateSaveStatus(false); }, 15000);
 };
 
 function generateQuote() {
