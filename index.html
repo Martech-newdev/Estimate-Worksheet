@@ -227,9 +227,47 @@
 
   .form-footer { display:flex; justify-content:space-between; padding:5px 16px; background:#e0e0de; border-top:1px solid #bbb; font-size:9px; color:#999; }
 
+  /* Defaults dialog */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+    display: none; align-items: center; justify-content: center; z-index: 1000;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal-card {
+    background: #fff; border-radius: 4px; width: 420px; max-width: calc(100% - 32px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+    font-family: 'Barlow', sans-serif;
+  }
+  .modal-head {
+    background: #1a5276; color: #fff; padding: 10px 16px;
+    font-family: 'Barlow Condensed', sans-serif; font-size: 15px;
+    font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+    border-radius: 4px 4px 0 0;
+  }
+  .modal-body { padding: 14px 16px 6px; }
+  .modal-body .hint {
+    font-size: 12px; color: #555; margin-bottom: 12px; line-height: 1.4;
+  }
+  .modal-field { margin-bottom: 10px; }
+  .modal-field label {
+    display: block; font-family: 'Barlow Condensed', sans-serif;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.5px;
+    text-transform: uppercase; color: #555; margin-bottom: 3px;
+  }
+  .modal-field input {
+    width: 100%; padding: 6px 8px; font-family: 'Barlow', sans-serif;
+    font-size: 13px; border: 1.5px solid #aaa; border-radius: 2px; outline: none;
+  }
+  .modal-field input:focus { border-color: #1a5276; }
+  .modal-foot {
+    display: flex; justify-content: flex-end; gap: 8px;
+    padding: 10px 16px 14px;
+  }
+
   @media print {
     body { background:#fff; padding:0; }
     .controls { display:none; }
+    .modal-overlay { display:none !important; }
     .form-card { box-shadow:none; border:none; max-width:100%; }
     .tab-page { display:block !important; }
     .meta-row-wide { grid-column: 1 / -1; }
@@ -248,6 +286,7 @@
   <button class="btn btn-blue" onclick="exportToFile()">&#128190; Save to File</button>
   <button class="btn btn-blue" onclick="document.getElementById('importFile').click()">&#128194; Load from File</button>
   <button class="btn btn-dark" onclick="clearForm()">&#8635; Clear Form</button>
+  <button class="btn btn-blue" onclick="openDefaultsDialog()" title="Set default Estimator and contact info to pre-fill on new worksheets">&#9881;&#65039; Defaults&hellip;</button>
   <input type="file" id="importFile" accept=".json,application/json" style="display:none" onchange="importFromFile(event)">
   <span id="saveStatus" class="save-status" aria-live="polite">Not saved yet</span>
 </div>
@@ -448,6 +487,33 @@
   <button class="btn btn-blue" onclick="exportToFile()">&#128190; Save to File</button>
   <button class="btn btn-blue" onclick="document.getElementById('importFile').click()">&#128194; Load from File</button>
   <button class="btn btn-dark" onclick="clearForm()">&#8635; Clear Form</button>
+  <button class="btn btn-blue" onclick="openDefaultsDialog()" title="Set default Estimator and contact info to pre-fill on new worksheets">&#9881;&#65039; Defaults&hellip;</button>
+</div>
+
+<div class="modal-overlay" id="defaultsModal" role="dialog" aria-modal="true" aria-labelledby="defaultsModalTitle">
+  <div class="modal-card">
+    <div class="modal-head" id="defaultsModalTitle">Default Estimator &amp; Contact</div>
+    <div class="modal-body">
+      <div class="hint">These defaults pre-fill on new or cleared worksheets. Editing the fields on a worksheet won't change the saved defaults.</div>
+      <div class="modal-field">
+        <label for="def_estimator">Estimator</label>
+        <input type="text" id="def_estimator" autocomplete="off">
+      </div>
+      <div class="modal-field">
+        <label for="def_contact">Contact</label>
+        <input type="text" id="def_contact" autocomplete="off">
+      </div>
+      <div class="modal-field">
+        <label for="def_contact_email">Contact Email</label>
+        <input type="email" id="def_contact_email" autocomplete="off">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-dark" onclick="clearDefaults()">Clear Defaults</button>
+      <button class="btn btn-blue" onclick="closeDefaultsDialog()">Cancel</button>
+      <button class="btn btn-green" onclick="saveDefaultsDialog()">Save Defaults</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -601,9 +667,11 @@ function clearForm() {
     if (pages[i].style.display !== 'none') { active = pages[i]; break; }
   }
   if (!active) return;
+  var activePrefix = (active.id === 'tab2') ? 'b' : 'a';
   var inputs = active.getElementsByTagName('input');
   for (var i = 0; i < inputs.length; i++) {
-    if (inputs[i].type === 'text' || inputs[i].type === 'number') inputs[i].value = '';
+    var t = inputs[i].type;
+    if (t === 'text' || t === 'number' || t === 'email') inputs[i].value = '';
   }
   var areas = active.getElementsByTagName('textarea');
   for (var i = 0; i < areas.length; i++) areas[i].value = '';
@@ -617,6 +685,7 @@ function clearForm() {
   for (var i = 0; i < svs.length; i++) {
     svs[i].innerHTML = svs[i].id && svs[i].id.indexOf('_s_hrs') > -1 ? '0' : '$0.00';
   }
+  applyDefaultsToPrefix(activePrefix, true);
   _currentWorksheetName = null;
   _baselineSnapshot = null;
   var lib = _readLibrary();
@@ -624,6 +693,88 @@ function clearForm() {
   saveForm();
   if (typeof refreshWorksheetPicker === 'function') refreshWorksheetPicker();
   if (typeof refreshDirtyIndicator === 'function') refreshDirtyIndicator();
+}
+
+// ── Default Estimator / Contact / Contact Email ──
+var DEFAULTS_KEY = 'martech_defaults_v1';
+var DEFAULT_FIELDS = ['estimator', 'contact', 'contact_email'];
+
+function _readDefaults() {
+  if (!_storageAvailable) return {};
+  try {
+    var raw = localStorage.getItem(DEFAULTS_KEY);
+    if (!raw) return {};
+    var d = JSON.parse(raw);
+    return (d && typeof d === 'object') ? d : {};
+  } catch (e) { return {}; }
+}
+
+function _writeDefaults(d) {
+  if (!_storageAvailable) return false;
+  try { localStorage.setItem(DEFAULTS_KEY, JSON.stringify(d || {})); return true; }
+  catch (e) { alert('Could not save defaults — browser storage is full or unavailable.'); return false; }
+}
+
+function applyDefaultsToPrefix(prefix, force) {
+  var d = _readDefaults();
+  for (var i = 0; i < DEFAULT_FIELDS.length; i++) {
+    var key = DEFAULT_FIELDS[i];
+    var val = (typeof d[key] === 'string') ? d[key] : '';
+    if (!val) continue;
+    var el = document.getElementById(prefix + '_' + key);
+    if (!el) continue;
+    if (force || !el.value) el.value = val;
+  }
+}
+
+function applyDefaultsIfBlank() {
+  var prefixes = ['a', 'b'];
+  for (var i = 0; i < prefixes.length; i++) applyDefaultsToPrefix(prefixes[i], false);
+}
+
+function openDefaultsDialog() {
+  if (!_storageAvailable) {
+    alert('Defaults can\'t be saved — browser storage is unavailable.');
+    return;
+  }
+  var d = _readDefaults();
+  var e = document.getElementById('def_estimator');
+  var c = document.getElementById('def_contact');
+  var m = document.getElementById('def_contact_email');
+  if (e) e.value = d.estimator || '';
+  if (c) c.value = d.contact || '';
+  if (m) m.value = d.contact_email || '';
+  var modal = document.getElementById('defaultsModal');
+  if (modal) modal.classList.add('open');
+  setTimeout(function() { if (e) e.focus(); }, 0);
+}
+
+function closeDefaultsDialog() {
+  var modal = document.getElementById('defaultsModal');
+  if (modal) modal.classList.remove('open');
+}
+
+function saveDefaultsDialog() {
+  var e = document.getElementById('def_estimator');
+  var c = document.getElementById('def_contact');
+  var m = document.getElementById('def_contact_email');
+  var d = {
+    estimator: e ? e.value.trim() : '',
+    contact: c ? c.value.trim() : '',
+    contact_email: m ? m.value.trim() : ''
+  };
+  if (_writeDefaults(d)) closeDefaultsDialog();
+}
+
+function clearDefaults() {
+  if (!confirm('Clear the saved defaults? New worksheets will no longer be pre-filled.')) return;
+  _writeDefaults({});
+  var e = document.getElementById('def_estimator');
+  var c = document.getElementById('def_contact');
+  var m = document.getElementById('def_contact_email');
+  if (e) e.value = '';
+  if (c) c.value = '';
+  if (m) m.value = '';
 }
 
 // ── Auto-save / restore worksheet data via localStorage ──
@@ -682,6 +833,7 @@ function collectFormData() {
     var el = els[i];
     if (el.type === 'button' || el.type === 'submit' || el.type === 'file') continue;
     if (el.id === 'wsPicker' || el.id === 'importFile') continue;
+    if (el.id.indexOf('def_') === 0) continue;
     data[el.id] = el.value;
   }
   return data;
@@ -748,6 +900,7 @@ function importFromFile(ev) {
       for (var i = 0; i < els.length; i++) {
         var el = els[i];
         if (el.type === 'button' || el.type === 'submit' || el.type === 'file') continue;
+        if (el.id && el.id.indexOf('def_') === 0) continue;
         if (el.tagName === 'SELECT') { el.selectedIndex = 0; } else { el.value = ''; }
       }
       applyFormData(data);
@@ -791,9 +944,11 @@ window.addEventListener('beforeunload', function(e) {
 function restoreForm() {
   try {
     var raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
+    if (!raw) return false;
     applyFormData(JSON.parse(raw));
+    return true;
   } catch (e) { /* corrupt storage — ignore */ }
+  return false;
 }
 
 // ── Worksheet library: save / load multiple named worksheets ──
@@ -1103,7 +1258,11 @@ window.onload = function() {
   buildSheet('b', 63);
   var pages = document.getElementsByClassName('tab-page');
   for (var i = 0; i < pages.length; i++) pages[i].style.display = i === 0 ? 'block' : 'none';
-  restoreForm();
+  var hadRestoredData = restoreForm();
+  if (!hadRestoredData) {
+    applyDefaultsIfBlank();
+    saveForm();
+  }
   // Restore "current named worksheet" pointer (if the auto-saved data still matches it).
   var lib = _readLibrary();
   if (lib.current && lib.items[lib.current]) {

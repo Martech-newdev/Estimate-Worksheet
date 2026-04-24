@@ -22,6 +22,11 @@ Single-page tool for creating professional job estimates with:
   explicitly via the picker's Save / Save As / Delete buttons. Switching to a
   saved worksheet asks for confirmation if the active worksheet has unsaved
   changes relative to its baseline.
+- `localStorage["martech_defaults_v1"]` — saved default values for the
+  Estimator, Contact, and Contact Email meta fields. Edited via the
+  "Defaults..." button. Pre-fill on first load (when no auto-saved data exists)
+  and after Clear Form on the active tab. Per-worksheet edits to those fields
+  do not change the saved defaults.
 
 ## Tech Stack
 
