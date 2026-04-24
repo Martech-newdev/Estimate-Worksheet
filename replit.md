@@ -23,12 +23,21 @@ Single-page tool for creating professional job estimates with:
   saved worksheet asks for confirmation if the active worksheet has unsaved
   changes relative to its baseline.
 - `localStorage["martech_defaults_v1"]` — saved default values for the
-  Estimator, Contact, Contact Email, Address Line 1, City/State/Zip, and
-  Default Markup meta fields, plus a `today_dates` toggle that pre-fills
-  Quote Date / Date In with today's date. Edited via the "Defaults..."
-  button. Pre-fill on first load (when no auto-saved data exists) and after
-  Clear Form on the active tab. Per-worksheet edits to those fields do not
-  change the saved defaults.
+  Estimator, Contact, Contact Email, Address Line 1, City/State/Zip,
+  Default Markup, Customer, and Project Name meta fields, plus a
+  `today_dates` toggle (pre-fills Quote Date / Date In with today's
+  date), a `jobnum_tpl` template for Job Number (supports `{YYYY}`,
+  `{YY}`, `{MM}`, `{DD}` date tokens and `{####}` for an
+  auto-incrementing counter), and a `due_offset_days` integer that
+  pre-fills Due Date as today + N days. Edited via the "Defaults..."
+  button. Pre-fill on first load (when no auto-saved data exists) and
+  after Clear Form on the active tab. Per-worksheet edits to those
+  fields do not change the saved defaults.
+- `localStorage["martech_defaults_counter_v1"]` — integer counter
+  consumed by the `{####}` token in the Job Number template. Increments
+  each time a worksheet is pre-filled with a templated job number. The
+  next value is shown and editable in the Defaults dialog; cleared to 1
+  by Clear Defaults.
 
 ## Tech Stack
 

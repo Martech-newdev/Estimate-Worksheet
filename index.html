@@ -287,7 +287,7 @@
   <button class="btn btn-blue" onclick="exportToFile()">&#128190; Save to File</button>
   <button class="btn btn-blue" onclick="document.getElementById('importFile').click()">&#128194; Load from File</button>
   <button class="btn btn-dark" onclick="clearForm()">&#8635; Clear Form</button>
-  <button class="btn btn-blue" onclick="openDefaultsDialog()" title="Set company-wide defaults (estimator, contact, address, markup, dates) to pre-fill on new worksheets">&#9881;&#65039; Defaults&hellip;</button>
+  <button class="btn btn-blue" onclick="openDefaultsDialog()" title="Set company-wide defaults (estimator, contact, address, markup, dates, customer, job number, project name, due date) to pre-fill on new worksheets">&#9881;&#65039; Defaults&hellip;</button>
   <input type="file" id="importFile" accept=".json,application/json" style="display:none" onchange="importFromFile(event)">
   <span id="saveStatus" class="save-status" aria-live="polite">Not saved yet</span>
 </div>
@@ -488,7 +488,7 @@
   <button class="btn btn-blue" onclick="exportToFile()">&#128190; Save to File</button>
   <button class="btn btn-blue" onclick="document.getElementById('importFile').click()">&#128194; Load from File</button>
   <button class="btn btn-dark" onclick="clearForm()">&#8635; Clear Form</button>
-  <button class="btn btn-blue" onclick="openDefaultsDialog()" title="Set company-wide defaults (estimator, contact, address, markup, dates) to pre-fill on new worksheets">&#9881;&#65039; Defaults&hellip;</button>
+  <button class="btn btn-blue" onclick="openDefaultsDialog()" title="Set company-wide defaults (estimator, contact, address, markup, dates, customer, job number, project name, due date) to pre-fill on new worksheets">&#9881;&#65039; Defaults&hellip;</button>
 </div>
 
 <div class="modal-overlay" id="defaultsModal" role="dialog" aria-modal="true" aria-labelledby="defaultsModalTitle">
@@ -532,6 +532,27 @@
           <input type="checkbox" id="def_today_dates" style="width:auto;margin:0;">
           Pre-fill Quote Date and Date In with today's date on new worksheets
         </label>
+      </div>
+      <div class="modal-field">
+        <label for="def_cust">Customer</label>
+        <input type="text" id="def_cust" autocomplete="off">
+      </div>
+      <div class="modal-field">
+        <label for="def_proj">Project Name</label>
+        <input type="text" id="def_proj" autocomplete="off">
+      </div>
+      <div class="modal-field">
+        <label for="def_jobnum_tpl">Job Number Template</label>
+        <input type="text" id="def_jobnum_tpl" autocomplete="off" placeholder="e.g. Q-{YYYY}-{####}">
+        <div class="hint" style="margin-top:4px;">Tokens: <code>{YYYY}</code> <code>{YY}</code> <code>{MM}</code> <code>{DD}</code> for today's date, and <code>{####}</code> (any length of #'s) for an auto-incrementing counter.</div>
+      </div>
+      <div class="modal-field">
+        <label for="def_jobnum_counter">Next counter value</label>
+        <input type="number" id="def_jobnum_counter" min="1" step="1" style="max-width:140px;" autocomplete="off">
+      </div>
+      <div class="modal-field">
+        <label for="def_due_offset">Due Date Offset (days from today)</label>
+        <input type="number" id="def_due_offset" step="1" style="max-width:140px;" autocomplete="off" placeholder="leave blank to skip">
       </div>
     </div>
     <div class="modal-foot">
@@ -723,8 +744,70 @@ function clearForm() {
 
 // ── Default field values pre-filled on new / cleared worksheets ──
 var DEFAULTS_KEY = 'martech_defaults_v1';
-var DEFAULT_FIELDS = ['estimator', 'contact', 'contact_email', 'addr1', 'addr2'];
+var DEFAULTS_COUNTER_KEY = 'martech_defaults_counter_v1';
+var DEFAULT_FIELDS = ['estimator', 'contact', 'contact_email', 'addr1', 'addr2', 'cust', 'proj'];
 var MARKUP_VALUES = ['1.54', '1.43', '1.33', '1.25', '1.18'];
+
+function _readCounter() {
+  if (!_storageAvailable) return 1;
+  try {
+    var v = parseInt(localStorage.getItem(DEFAULTS_COUNTER_KEY), 10);
+    return (isNaN(v) || v < 1) ? 1 : v;
+  } catch (e) { return 1; }
+}
+function _writeCounter(n) {
+  if (!_storageAvailable) return;
+  try { localStorage.setItem(DEFAULTS_COUNTER_KEY, String(n)); } catch (e) {}
+}
+function _consumeCounter() {
+  var n = _readCounter();
+  _writeCounter(n + 1);
+  return n;
+}
+
+function _pad2(n) { return (n < 10 ? '0' : '') + n; }
+function _formatMDY(date) {
+  return _pad2(date.getMonth() + 1) + '/' + _pad2(date.getDate()) + '/' + date.getFullYear();
+}
+
+function _resolveJobnumTemplate(tpl) {
+  if (!tpl) return '';
+  var now = new Date();
+  var yyyy = String(now.getFullYear());
+  var yy = yyyy.slice(-2);
+  var mm = _pad2(now.getMonth() + 1);
+  var dd = _pad2(now.getDate());
+  var s = tpl
+    .replace(/\{YYYY\}/g, yyyy)
+    .replace(/\{YY\}/g, yy)
+    .replace(/\{MM\}/g, mm)
+    .replace(/\{DD\}/g, dd);
+  if (/\{#+\}/.test(s)) {
+    var n = _consumeCounter();
+    s = s.replace(/\{(#+)\}/g, function(_, hashes) {
+      var str = String(n);
+      while (str.length < hashes.length) str = '0' + str;
+      return str;
+    });
+  }
+  return s;
+}
+
+function _resolveDuedateOffset(off) {
+  if (off === '' || off === null || typeof off === 'undefined') return '';
+  var n = parseInt(off, 10);
+  if (isNaN(n)) return '';
+  var d = new Date();
+  d.setDate(d.getDate() + n);
+  return _formatMDY(d);
+}
+
+function _resolveDefaults(d) {
+  return {
+    jobnum: _resolveJobnumTemplate(typeof d.jobnum_tpl === 'string' ? d.jobnum_tpl : ''),
+    duedate: _resolveDuedateOffset(d.due_offset_days)
+  };
+}
 
 function _readDefaults() {
   if (!_storageAvailable) return {};
@@ -750,8 +833,9 @@ function _todayMDY() {
   return mm + '/' + dd + '/' + yyyy;
 }
 
-function applyDefaultsToPrefix(prefix, force) {
+function applyDefaultsToPrefix(prefix, force, resolved) {
   var d = _readDefaults();
+  if (!resolved) resolved = _resolveDefaults(d);
   // Text fields
   for (var i = 0; i < DEFAULT_FIELDS.length; i++) {
     var key = DEFAULT_FIELDS[i];
@@ -760,6 +844,16 @@ function applyDefaultsToPrefix(prefix, force) {
     var el = document.getElementById(prefix + '_' + key);
     if (!el) continue;
     if (force || !el.value) el.value = val;
+  }
+  // Job Number from template
+  if (resolved.jobnum) {
+    var jn = document.getElementById(prefix + '_jobnum');
+    if (jn && (force || !jn.value)) jn.value = resolved.jobnum;
+  }
+  // Due Date from offset
+  if (resolved.duedate) {
+    var dd = document.getElementById(prefix + '_duedate');
+    if (dd && (force || !dd.value)) dd.value = resolved.duedate;
   }
   // Default Markup (select)
   var mkup = (typeof d.mkup === 'string') ? d.mkup : '';
@@ -783,8 +877,10 @@ function applyDefaultsToPrefix(prefix, force) {
 }
 
 function applyDefaultsIfBlank() {
+  var d = _readDefaults();
+  var resolved = _resolveDefaults(d);
   var prefixes = ['a', 'b'];
-  for (var i = 0; i < prefixes.length; i++) applyDefaultsToPrefix(prefixes[i], false);
+  for (var i = 0; i < prefixes.length; i++) applyDefaultsToPrefix(prefixes[i], false, resolved);
 }
 
 function openDefaultsDialog() {
@@ -800,6 +896,11 @@ function openDefaultsDialog() {
   var a2 = document.getElementById('def_addr2');
   var mk = document.getElementById('def_mkup');
   var td = document.getElementById('def_today_dates');
+  var cu = document.getElementById('def_cust');
+  var pr = document.getElementById('def_proj');
+  var jt = document.getElementById('def_jobnum_tpl');
+  var jc = document.getElementById('def_jobnum_counter');
+  var doff = document.getElementById('def_due_offset');
   if (e) e.value = d.estimator || '';
   if (c) c.value = d.contact || '';
   if (m) m.value = d.contact_email || '';
@@ -807,6 +908,11 @@ function openDefaultsDialog() {
   if (a2) a2.value = d.addr2 || '';
   if (mk) mk.value = (typeof d.mkup === 'string' && MARKUP_VALUES.indexOf(d.mkup) !== -1) ? d.mkup : '';
   if (td) td.checked = !!d.today_dates;
+  if (cu) cu.value = d.cust || '';
+  if (pr) pr.value = d.proj || '';
+  if (jt) jt.value = d.jobnum_tpl || '';
+  if (jc) jc.value = String(_readCounter());
+  if (doff) doff.value = (d.due_offset_days === '' || d.due_offset_days === null || typeof d.due_offset_days === 'undefined') ? '' : String(d.due_offset_days);
   var modal = document.getElementById('defaultsModal');
   if (modal) modal.classList.add('open');
   setTimeout(function() { if (e) e.focus(); }, 0);
@@ -825,8 +931,19 @@ function saveDefaultsDialog() {
   var a2 = document.getElementById('def_addr2');
   var mk = document.getElementById('def_mkup');
   var td = document.getElementById('def_today_dates');
+  var cu = document.getElementById('def_cust');
+  var pr = document.getElementById('def_proj');
+  var jt = document.getElementById('def_jobnum_tpl');
+  var jc = document.getElementById('def_jobnum_counter');
+  var doff = document.getElementById('def_due_offset');
   var mkVal = mk ? mk.value : '';
   if (mkVal && MARKUP_VALUES.indexOf(mkVal) === -1) mkVal = '';
+  var doffRaw = doff ? doff.value.trim() : '';
+  var doffVal = '';
+  if (doffRaw !== '') {
+    var doffParsed = parseInt(doffRaw, 10);
+    if (!isNaN(doffParsed)) doffVal = doffParsed;
+  }
   var d = {
     estimator: e ? e.value.trim() : '',
     contact: c ? c.value.trim() : '',
@@ -834,21 +951,32 @@ function saveDefaultsDialog() {
     addr1: a1 ? a1.value.trim() : '',
     addr2: a2 ? a2.value.trim() : '',
     mkup: mkVal,
-    today_dates: !!(td && td.checked)
+    today_dates: !!(td && td.checked),
+    cust: cu ? cu.value.trim() : '',
+    proj: pr ? pr.value.trim() : '',
+    jobnum_tpl: jt ? jt.value.trim() : '',
+    due_offset_days: doffVal
   };
+  if (jc) {
+    var cVal = parseInt(jc.value, 10);
+    if (!isNaN(cVal) && cVal >= 1) _writeCounter(cVal);
+  }
   if (_writeDefaults(d)) closeDefaultsDialog();
 }
 
 function clearDefaults() {
-  if (!confirm('Clear the saved defaults? New worksheets will no longer be pre-filled.')) return;
+  if (!confirm('Clear the saved defaults? New worksheets will no longer be pre-filled. The job number counter will reset to 1.')) return;
   _writeDefaults({});
-  var ids = ['def_estimator', 'def_contact', 'def_contact_email', 'def_addr1', 'def_addr2', 'def_mkup'];
+  _writeCounter(1);
+  var ids = ['def_estimator', 'def_contact', 'def_contact_email', 'def_addr1', 'def_addr2', 'def_mkup', 'def_cust', 'def_proj', 'def_jobnum_tpl', 'def_due_offset'];
   for (var i = 0; i < ids.length; i++) {
     var el = document.getElementById(ids[i]);
     if (el) el.value = '';
   }
   var td = document.getElementById('def_today_dates');
   if (td) td.checked = false;
+  var jc = document.getElementById('def_jobnum_counter');
+  if (jc) jc.value = '1';
 }
 
 // ── Auto-save / restore worksheet data via localStorage ──
