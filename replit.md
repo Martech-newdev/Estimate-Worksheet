@@ -20,8 +20,15 @@ Single-page tool for creating professional job estimates with:
   overwritten. Defaults dialog Customer continues to pre-fill new
   worksheets independently.
 - A "Customers..." dialog (next to "Defaults..." on both tabs) for managing
-  the suggestion list directly: each customer row shows its current name,
-  address, contact, and how many saved worksheets reference it. The
+  the suggestion list directly. A search/filter input at the top of the
+  dialog narrows the visible rows in real time as the user types
+  (case-insensitive match against the customer name and against the job
+  number / project name / saved-worksheet name of any of the customer's
+  worksheets); a "Clear" button and a "X of Y shown" count appear while
+  the filter is active. Hidden customers are still searchable so they can
+  be Restored, and an empty result shows a "no customers match" message.
+  Each customer row shows its current name, address, contact, and how
+  many saved worksheets reference it. The
   "Used in N saved worksheets" line is itself an expand toggle — clicking
   it reveals a list of those worksheets (job number, worksheet name,
   project name, relative save date, with the currently-loaded one tagged).

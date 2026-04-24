@@ -421,6 +421,26 @@
     display: flex; justify-content: flex-end; gap: 8px;
     margin-bottom: 10px;
   }
+  .cust-filter-row {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 8px;
+  }
+  .cust-filter-row input {
+    flex: 1 1 auto; padding: 6px 8px;
+    font-family: 'Barlow', sans-serif; font-size: 13px;
+    border: 1.5px solid #aaa; border-radius: 2px; outline: none;
+    box-sizing: border-box;
+  }
+  .cust-filter-row input:focus { border-color: #1a5276; }
+  .cust-filter-row .cust-filter-clear {
+    padding: 4px 10px; font-size: 11px; min-height: 0;
+  }
+  .cust-filter-count {
+    font-size: 11px; color: #777;
+    font-family: 'Barlow Condensed', sans-serif;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    white-space: nowrap;
+  }
   /* Import customers dialog */
   textarea#importCustText {
     width: 100%; min-height: 120px; padding: 6px 8px;
@@ -782,6 +802,11 @@
       <div class="hint">Customers shown here are collected from your saved worksheets and any list you've imported. Edit fixes typos and updates the contact info used to autofill new quotes; Merge consolidates two entries by renaming one across all saved worksheets; Delete removes the customer from the suggestion dropdown (and optionally clears its info from saved worksheets). Use Import Customers to seed the dropdown from a pasted list or CSV.</div>
       <div class="cust-actions-bar">
         <button class="btn btn-blue" onclick="openImportCustomersDialog()">Import Customers...</button>
+      </div>
+      <div class="cust-filter-row">
+        <input type="search" id="customersFilter" placeholder="Filter by customer, project, or job number…" autocomplete="off" spellcheck="false">
+        <button type="button" class="btn btn-blue cust-filter-clear" id="customersFilterClear" onclick="clearCustomersFilter()" style="display:none;">Clear</button>
+        <span class="cust-filter-count" id="customersFilterCount" aria-live="polite"></span>
       </div>
       <div class="cust-list" id="customersList"></div>
     </div>
@@ -1847,6 +1872,7 @@ function _escHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&l
 var _editingCustomerKey = null;
 var _customerActionMode = null; // 'edit' | 'merge' | 'delete'
 var _expandedCustomerKeys = {}; // customer key -> true when its job list is expanded
+var _customersFilterText = '';
 
 function _mergeManagementCandidate(byKey, key, cand, excluded, opts) {
   var prev = byKey[key];
@@ -2120,6 +2146,10 @@ function openCustomersDialog() {
   _editingCustomerKey = null;
   _customerActionMode = null;
   _expandedCustomerKeys = {};
+  _customersFilterText = '';
+  var filterInput = document.getElementById('customersFilter');
+  if (filterInput) filterInput.value = '';
+  _wireCustomersFilterHandler();
   renderCustomersList();
   _wireCustomersListHandler();
   var modal = document.getElementById('customersModal');
@@ -2136,9 +2166,17 @@ function closeCustomersDialog() {
 function renderCustomersList() {
   var container = document.getElementById('customersList');
   if (!container) return;
-  var list = _collectCustomersForManagement();
-  if (!list.length) {
+  var fullList = _collectCustomersForManagement();
+  var totalCount = fullList.length;
+  var filterText = (_customersFilterText || '').trim().toLowerCase();
+  var list = filterText ? _filterCustomersForList(fullList, filterText) : fullList;
+  _updateCustomersFilterCount(list.length, totalCount, filterText);
+  if (!totalCount) {
     container.innerHTML = '<div class="cust-empty">No customers found in saved worksheets yet. Save a worksheet with a customer name to start building this list.</div>';
+    return;
+  }
+  if (!list.length) {
+    container.innerHTML = '<div class="cust-empty">No customers match "' + _escHtml(_customersFilterText.trim()) + '". Try a different name, project, or job number.</div>';
     return;
   }
   var html = '';
@@ -2210,6 +2248,66 @@ function renderCustomersList() {
       if (el) el.focus();
     }, 0);
   }
+}
+
+function _filterCustomersForList(list, filterText) {
+  var out = [];
+  for (var i = 0; i < list.length; i++) {
+    var c = list[i];
+    if (_customerMatchesFilter(c, filterText)) out.push(c);
+  }
+  return out;
+}
+
+function _customerMatchesFilter(c, filterText) {
+  if (!filterText) return true;
+  if ((c.name || '').toLowerCase().indexOf(filterText) !== -1) return true;
+  var ws = c.worksheetList || [];
+  for (var i = 0; i < ws.length; i++) {
+    var w = ws[i];
+    if (w.jobnum  && w.jobnum.toLowerCase().indexOf(filterText)  !== -1) return true;
+    if (w.project && w.project.toLowerCase().indexOf(filterText) !== -1) return true;
+    if (w.name    && w.name.toLowerCase().indexOf(filterText)    !== -1) return true;
+  }
+  return false;
+}
+
+function _updateCustomersFilterCount(shown, total, filterText) {
+  var countEl = document.getElementById('customersFilterCount');
+  var clearBtn = document.getElementById('customersFilterClear');
+  if (clearBtn) clearBtn.style.display = filterText ? '' : 'none';
+  if (!countEl) return;
+  if (!filterText) {
+    countEl.textContent = '';
+  } else {
+    countEl.textContent = shown + ' of ' + total + ' shown';
+  }
+}
+
+var _customersFilterHandlerWired = false;
+function _wireCustomersFilterHandler() {
+  if (_customersFilterHandlerWired) return;
+  var input = document.getElementById('customersFilter');
+  if (!input) return;
+  input.addEventListener('input', function() {
+    _customersFilterText = input.value || '';
+    if (_editingCustomerKey) {
+      _editingCustomerKey = null;
+      _customerActionMode = null;
+    }
+    renderCustomersList();
+  });
+  _customersFilterHandlerWired = true;
+}
+
+function clearCustomersFilter() {
+  _customersFilterText = '';
+  var input = document.getElementById('customersFilter');
+  if (input) {
+    input.value = '';
+    input.focus();
+  }
+  renderCustomersList();
 }
 
 function _renderCustomerJobsList(c) {
