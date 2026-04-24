@@ -590,13 +590,12 @@ function generateQuote() {
 
   // Read meta fields
   function gField(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; }
-  var qdate     = gField(p + '_qdate');
-  var cust      = gField(p + '_cust');
-  var contact   = gField(p + '_contact');
-  var jobnum    = gField(p + '_jobnum');
-  var proj      = gField(p + '_proj');
-  var estimator = gField(p + '_estimator');
-  var notes     = gField(p + '_notes');
+  var qdate   = gField(p + '_qdate');
+  var cust    = gField(p + '_cust');
+  var contact = gField(p + '_contact');
+  var jobnum  = gField(p + '_jobnum');
+  var proj    = gField(p + '_proj');
+  var notes   = gField(p + '_notes');
 
   // Read display totals
   function gText(id) { var el = document.getElementById(id); return el ? el.textContent.trim() : '$0.00'; }
