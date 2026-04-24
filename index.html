@@ -663,6 +663,7 @@
       <div class="modal-field">
         <label for="def_due_offset">Due Date Offset (days from today)</label>
         <input type="number" id="def_due_offset" step="1" style="max-width:140px;" autocomplete="off" placeholder="leave blank to skip">
+        <div id="def_due_offset_preview" class="hint" style="margin-top:4px; display:none; color:#1a5fb4;"></div>
       </div>
     </div>
     <div class="modal-foot">
@@ -944,6 +945,21 @@ function _resolveDuedateOffset(off) {
   return _formatMDY(d);
 }
 
+function _updateDueOffsetPreview() {
+  var prev = document.getElementById('def_due_offset_preview');
+  if (!prev) return;
+  var offEl = document.getElementById('def_due_offset');
+  var raw = offEl ? offEl.value : '';
+  var resolved = _resolveDuedateOffset(raw);
+  if (!resolved) {
+    prev.style.display = 'none';
+    prev.textContent = '';
+    return;
+  }
+  prev.textContent = 'Preview: ' + resolved;
+  prev.style.display = '';
+}
+
 function _resolveDefaults(d) {
   return {
     jobnum: _resolveJobnumTemplate(typeof d.jobnum_tpl === 'string' ? d.jobnum_tpl : ''),
@@ -1057,7 +1073,9 @@ function openDefaultsDialog() {
   if (doff) doff.value = (d.due_offset_days === '' || d.due_offset_days === null || typeof d.due_offset_days === 'undefined') ? '' : String(d.due_offset_days);
   if (jt) jt.oninput = _updateJobnumPreview;
   if (jc) jc.oninput = _updateJobnumPreview;
+  if (doff) doff.oninput = _updateDueOffsetPreview;
   _updateJobnumPreview();
+  _updateDueOffsetPreview();
   var modal = document.getElementById('defaultsModal');
   if (modal) modal.classList.add('open');
   setTimeout(function() { if (e) e.focus(); }, 0);
@@ -1123,6 +1141,7 @@ function clearDefaults() {
   var jc = document.getElementById('def_jobnum_counter');
   if (jc) jc.value = '1';
   _updateJobnumPreview();
+  _updateDueOffsetPreview();
 }
 
 // ── Auto-save / restore worksheet data via localStorage ──

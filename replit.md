@@ -58,7 +58,9 @@ Single-page tool for creating professional job estimates with:
   template field, computed from the current template and the current
   "Next counter value" (today's date for date tokens). The preview
   never consumes the persisted counter and hides itself when the
-  template is empty.
+  template is empty. The Due Date Offset field has a matching live
+  read-only preview underneath it showing the resolved MM/DD/YYYY
+  date (today + N days); it hides when the offset is empty/invalid.
 - `localStorage["martech_defaults_counter_v1"]` — integer counter
   consumed by the `{####}` token in the Job Number template. Increments
   each time a worksheet is pre-filled with a templated job number. The
