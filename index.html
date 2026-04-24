@@ -258,6 +258,8 @@
     <select id="wsPicker" onchange="onPickerChange(this)"></select>
     <button class="btn btn-green" onclick="saveCurrentWorksheet()" title="Save under current name">&#128190; Save</button>
     <button class="btn btn-blue"  onclick="saveWorksheetAs()" title="Save current worksheet under a new name">&#128221; Save As&hellip;</button>
+    <button class="btn btn-blue"  onclick="renameCurrentWorksheet()" title="Rename the loaded worksheet in your library">&#9999;&#65039; Rename&hellip;</button>
+    <button class="btn btn-blue"  onclick="duplicateCurrentWorksheet()" title="Save a copy of the loaded worksheet under a new name">&#128203; Duplicate&hellip;</button>
     <button class="btn btn-dark"  onclick="deleteCurrentWorksheet()" title="Delete the selected saved worksheet">&#128465; Delete</button>
   </div>
 </div>
@@ -990,6 +992,85 @@ function _suggestWorksheetName() {
   if (cust) parts.push(cust);
   else if (proj) parts.push(proj);
   return parts.join(' — ') || '';
+}
+
+function renameCurrentWorksheet() {
+  if (!_storageAvailable) { alert('Browser storage is unavailable — use Save to File instead.'); return; }
+  if (!_currentWorksheetName) {
+    alert('No saved worksheet is currently loaded. Pick one from the dropdown first, or use Save As to name a new worksheet.');
+    return;
+  }
+  var lib = _readLibrary();
+  if (!lib.items[_currentWorksheetName]) {
+    alert('That worksheet no longer exists in your library.');
+    _currentWorksheetName = null;
+    _baselineSnapshot = null;
+    refreshWorksheetPicker();
+    refreshDirtyIndicator();
+    return;
+  }
+  var oldName = _currentWorksheetName;
+  var name = prompt('Rename "' + oldName + '" to:', oldName);
+  if (name == null) return;
+  name = name.trim();
+  if (!name) { alert('Please enter a name.'); return; }
+  if (name.length > 80) { alert('Name is too long (max 80 characters).'); return; }
+  if (name === oldName) return;
+  if (lib.items[name]) {
+    if (!confirm('A worksheet named "' + name + '" already exists. Overwrite it with "' + oldName + '"?')) return;
+  }
+  var entry = lib.items[oldName];
+  delete lib.items[oldName];
+  lib.items[name] = entry;
+  lib.current = name;
+  if (!_writeLibrary(lib)) return;
+  _currentWorksheetName = name;
+  refreshWorksheetPicker();
+  refreshDirtyIndicator();
+}
+
+function duplicateCurrentWorksheet() {
+  if (!_storageAvailable) { alert('Browser storage is unavailable — use Save to File instead.'); return; }
+  if (!_currentWorksheetName) {
+    alert('Load a saved worksheet first, then use Duplicate to save a copy under a new name.');
+    return;
+  }
+  if (isWorksheetDirty()) {
+    if (!confirm('The loaded worksheet has unsaved changes. The duplicate will include those changes. Continue?')) return;
+  }
+  var base = _currentWorksheetName;
+  var lib = _readLibrary();
+  var suggested = _uniqueCopyName(base, lib);
+  var name = prompt('Save duplicate of "' + base + '" as:', suggested);
+  if (name == null) return;
+  name = name.trim();
+  if (!name) { alert('Please enter a name.'); return; }
+  if (name.length > 80) { alert('Name is too long (max 80 characters).'); return; }
+  if (name === base) {
+    alert('Choose a different name so the original is not overwritten.');
+    return;
+  }
+  if (lib.items[name]) {
+    if (!confirm('A worksheet named "' + name + '" already exists. Overwrite it?')) return;
+  }
+  lib.items[name] = { data: collectFormData(), savedAt: new Date().toISOString() };
+  lib.current = name;
+  if (!_writeLibrary(lib)) return;
+  _currentWorksheetName = name;
+  _baselineSnapshot = _snapshotString();
+  saveForm();
+  refreshWorksheetPicker();
+  refreshDirtyIndicator();
+}
+
+function _uniqueCopyName(base, lib) {
+  var candidate = base + ' (copy)';
+  if (!lib.items[candidate]) return candidate;
+  for (var n = 2; n < 1000; n++) {
+    var c = base + ' (copy ' + n + ')';
+    if (!lib.items[c]) return c;
+  }
+  return candidate;
 }
 
 function deleteCurrentWorksheet() {
