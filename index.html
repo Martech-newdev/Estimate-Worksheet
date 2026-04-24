@@ -3390,6 +3390,17 @@ function generateQuote() {
   // Assemble document children
   var ch = [];
 
+  // ── Company letterhead (lives in the body so it sits below/left of the
+  //     header logo on page 1; matches the original docx template) ──
+  ch.push(para([
+    run('MarTech', { bold: true, size: 32, color: '1a1a1a' }),
+    run(' - Mechanical Analysis and Repair', { size: 24, color: '1a1a1a' })
+  ], { spaceAfter: 60 }));
+  ch.push(para([
+    run('Lodi, CA \u00a0(209) 333-8478\u00a0|\u00a0www.mar-tech.com', { size: 20, color: '444444' })
+  ], { spaceAfter: 200 }));
+  ch.push(blank());
+
   // Date + quote number + prepared-by (matches template body opening)
   ch.push(para([run('Date:\u00a0\u00a0' + (qdate || '___________'))]));
   if (jobnum)    ch.push(para([run('Quote #' + jobnum)], { spaceAfter: 40 }));
@@ -3514,50 +3525,19 @@ function generateQuote() {
       return r.arrayBuffer();
     })
     .then(function(logoBuf) {
-      // ── Page header (FIRST PAGE ONLY): letterhead text left, logo image right ──
-      var headerLeftPara1 = new D.Paragraph({
-        alignment: AT.LEFT,
-        spacing: { after: 60 },
-        children: [
-          new D.TextRun({ text: 'MarTech', bold: true, size: 32, font: 'Calibri', color: '1a1a1a' }),
-          new D.TextRun({ text: ' - Mechanical Analysis and Repair', size: 24, font: 'Calibri', color: '1a1a1a' })
-        ]
-      });
-      var headerLeftPara2 = new D.Paragraph({
-        alignment: AT.LEFT,
-        spacing: { after: 0 },
-        children: [
-          new D.TextRun({ text: 'Lodi, CA  (209) 333-8478\u00a0|\u00a0Rons@mar-tech.com', size: 20, font: 'Calibri', color: '444444' })
-        ]
-      });
-      var headerImagePara = new D.Paragraph({
-        alignment: AT.RIGHT,
-        spacing: { after: 0 },
-        children: [new D.ImageRun({
-          data: logoBuf,
-          transformation: { width: 90, height: 182 }
+      // ── Page header (FIRST PAGE ONLY): just the MarTech logo, right-aligned, 1.25" wide ──
+      // Logo source is 184x373; preserve aspect: 1.25" → 120 px wide × 243 px tall at 96 DPI.
+      var pageHeader = new D.Header({
+        children: [new D.Paragraph({
+          alignment: AT.RIGHT,
+          spacing: { after: 0 },
+          children: [new D.ImageRun({
+            data: logoBuf,
+            transformation: { width: 120, height: 243 }
+          })]
         })]
       });
-      var headerTable = new D.Table({
-        width: { size: 100, type: WU.PERCENTAGE },
-        borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder, insideH: noBorder, insideV: noBorder },
-        rows: [
-          new D.TableRow({ children: [
-            cellOf([headerLeftPara1, headerLeftPara2], 70, D.VerticalAlign.TOP),
-            cellOf([headerImagePara], 30, D.VerticalAlign.TOP)
-          ]})
-        ]
-      });
-      // Word requires a paragraph after a table inside a header/footer; without it
-      // Word reports "unreadable content". Append a tiny (size 2) terminator paragraph.
-      // Use a non-empty text run so it produces a proper <w:t> element, not <w:r/>,
-      // which some Word versions reject during validation.
-      var headerTerminator = new D.Paragraph({
-        spacing: { after: 0, before: 0, line: 20 },
-        children: [new D.TextRun({ text: ' ', size: 2 })]
-      });
-      var pageHeader = new D.Header({ children: [headerTable, headerTerminator] });
-      // "Blank" header for pages 2+ — also needs a real text run so the run isn't empty.
+      // "Blank" header for pages 2+ — needs a real text run so the run isn't empty.
       var emptyHeader = new D.Header({
         children: [new D.Paragraph({
           spacing: { after: 0, line: 20 },
@@ -3620,7 +3600,7 @@ function generateQuote() {
       var doc = new D.Document({
         sections: [{
           properties: {
-            page: { margin: { top: 1440, right: 1080, bottom: 2160, left: 1080 } },
+            page: { margin: { top: 1440, right: 1080, bottom: 1440, left: 1080, header: 720, footer: 0 } },
             titlePage: true   // enables a different (full) header on page 1 vs pages 2+
           },
           headers: { default: emptyHeader, first: pageHeader },
