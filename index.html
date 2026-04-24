@@ -3336,7 +3336,7 @@ function generateQuote() {
   var scopeParas = [];
   for (var s = 0; s < scopeItems.length; s++) {
     var item = scopeItems[s];
-    scopeParas.push(para([run(item.num + '\u00a0\u00a0' + item.text)], { spaceAfter: 80 }));
+    scopeParas.push(para([run(item.num + ' - ' + item.text)], { spaceAfter: 80 }));
   }
   if (scopeParas.length === 0) scopeParas.push(para('(No scope items entered)'));
 
@@ -3507,8 +3507,8 @@ function generateQuote() {
             transformation: { width: 60, height: 120 },
             floating: {
               horizontalPosition: {
-                relative: D.HorizontalPositionRelativeFrom.MARGIN,
-                align: D.HorizontalPositionAlign.RIGHT
+                relative: D.HorizontalPositionRelativeFrom.COLUMN,
+                offset: 5379085
               },
               verticalPosition: {
                 relative: D.VerticalPositionRelativeFrom.PARAGRAPH,
@@ -3602,7 +3602,10 @@ function generateQuote() {
       var doc = new D.Document({
         sections: [{
           properties: {
-            page: { margin: { top: 1080, right: 1080, bottom: 1080, left: 1080, header: 720, footer: 0 } }
+            page: {
+              size: { width: 11906, height: 16838 },   // A4 (matches reference template)
+              margin: { top: 1080, right: 1080, bottom: 1080, left: 1080, header: 720, footer: 0 }
+            }
           },
           headers: { default: pageHeader },
           footers: { default: pageFooter },
