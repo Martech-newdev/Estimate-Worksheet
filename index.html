@@ -3390,31 +3390,15 @@ function generateQuote() {
   // Assemble document children
   var ch = [];
 
-  // ── Company letterhead (body, matches reference template exactly) ──
-  // Para 1: "MarTech" bold 18pt + " - Mechanical Analysis and Repair" 11pt regular
+  // ── Company letterhead (body) — single-line, no web hyperlink ──
+  // "MarTech" bold 18pt + " - Mechanical Analysis and Repair " 11pt + "Lodi, CA (209) 333-8478" 11pt
   ch.push(new D.Paragraph({
     spacing: { after: 40 },
     children: [
       new D.TextRun({ text: 'MarTech', bold: true, size: 36, font: 'Calibri', color: '1A1A1A' }),
       new D.TextRun({ text: ' - ', font: 'Calibri' }),
-      new D.TextRun({ text: 'Mechanical Analysis and Repair', size: 22, font: 'Calibri', color: '444444' })
-    ]
-  }));
-  // Para 2: "Lodi, CA (209) 333-8478 |" + hyperlink "www.mar-tech.com"
-  var bodyWebHyperlink = new D.ExternalHyperlink({
-    link: 'http://www.mar-tech.com',
-    children: [new D.TextRun({
-      text: 'www.mar-tech.com',
-      font: 'Century Gothic', size: 16, color: '0000FF',
-      underline: { type: 'single', color: '0000FF' }
-    })]
-  });
-  ch.push(new D.Paragraph({
-    spacing: { after: 40 },
-    children: [
-      new D.TextRun({ text: 'Lodi, CA ', size: 22, font: 'Calibri', color: '444444' }),
-      new D.TextRun({ text: '(209) 333-8478 |', size: 22, font: 'Calibri', color: '444444' }),
-      bodyWebHyperlink
+      new D.TextRun({ text: 'Mechanical Analysis and Repair  ', size: 22, font: 'Calibri', color: '444444' }),
+      new D.TextRun({ text: 'Lodi, CA (209) 333-8478', size: 22, font: 'Calibri', color: '444444' })
     ]
   }));
   ch.push(blank());
@@ -3425,10 +3409,18 @@ function generateQuote() {
   if (estimator) ch.push(para([run('Prepared by:\u00a0\u00a0' + estimator)], { spaceAfter: 40 }));
   ch.push(blank());
 
-  // Customer block
-  if (cust)  ch.push(para([run(cust)]));
-  if (addr1) ch.push(para([run(addr1)]));
-  if (addr2) ch.push(para([run(addr2)]));
+  // Customer block — single-line, customer name bold, address parts joined with spaces
+  var custChildren = [];
+  if (cust) custChildren.push(run(cust, { bold: true }));
+  if (addr1) {
+    if (custChildren.length) custChildren.push(run(' '));
+    custChildren.push(run(addr1));
+  }
+  if (addr2) {
+    if (custChildren.length) custChildren.push(run(' '));
+    custChildren.push(run(addr2));
+  }
+  if (custChildren.length) ch.push(para(custChildren));
   ch.push(blank());
 
   // Attention — uses "Name | email" with email as a clickable mailto hyperlink when provided
