@@ -546,6 +546,7 @@
       <div class="modal-field">
         <label for="def_jobnum_tpl">Job Number Template</label>
         <input type="text" id="def_jobnum_tpl" autocomplete="off" placeholder="e.g. Q-{YYYY}-{####}">
+        <div id="def_jobnum_preview" class="hint" style="margin-top:4px; display:none; color:#1a5fb4;"></div>
         <div class="hint" style="margin-top:4px;">Tokens: <code>{YYYY}</code> <code>{YY}</code> <code>{MM}</code> <code>{DD}</code> for today's date, and <code>{####}</code> (any length of #'s) for an auto-incrementing counter.</div>
       </div>
       <div class="modal-field">
@@ -772,7 +773,7 @@ function _formatMDY(date) {
   return _pad2(date.getMonth() + 1) + '/' + _pad2(date.getDate()) + '/' + date.getFullYear();
 }
 
-function _resolveJobnumTemplate(tpl) {
+function _resolveJobnumTemplate(tpl, counterOverride) {
   if (!tpl) return '';
   var now = new Date();
   var yyyy = String(now.getFullYear());
@@ -785,7 +786,9 @@ function _resolveJobnumTemplate(tpl) {
     .replace(/\{MM\}/g, mm)
     .replace(/\{DD\}/g, dd);
   if (/\{#+\}/.test(s)) {
-    var n = _consumeCounter();
+    var n = (typeof counterOverride === 'number' && !isNaN(counterOverride))
+      ? counterOverride
+      : _consumeCounter();
     s = s.replace(/\{(#+)\}/g, function(_, hashes) {
       var str = String(n);
       while (str.length < hashes.length) str = '0' + str;
@@ -793,6 +796,23 @@ function _resolveJobnumTemplate(tpl) {
     });
   }
   return s;
+}
+
+function _updateJobnumPreview() {
+  var prev = document.getElementById('def_jobnum_preview');
+  if (!prev) return;
+  var tplEl = document.getElementById('def_jobnum_tpl');
+  var ctrEl = document.getElementById('def_jobnum_counter');
+  var tpl = tplEl ? tplEl.value : '';
+  if (!tpl) {
+    prev.style.display = 'none';
+    prev.textContent = '';
+    return;
+  }
+  var c = ctrEl ? parseInt(ctrEl.value, 10) : NaN;
+  if (isNaN(c) || c < 1) c = _readCounter();
+  prev.textContent = 'Preview: ' + _resolveJobnumTemplate(tpl, c);
+  prev.style.display = '';
 }
 
 function _resolveDuedateOffset(off) {
@@ -915,6 +935,9 @@ function openDefaultsDialog() {
   if (jt) jt.value = d.jobnum_tpl || '';
   if (jc) jc.value = String(_readCounter());
   if (doff) doff.value = (d.due_offset_days === '' || d.due_offset_days === null || typeof d.due_offset_days === 'undefined') ? '' : String(d.due_offset_days);
+  if (jt) jt.oninput = _updateJobnumPreview;
+  if (jc) jc.oninput = _updateJobnumPreview;
+  _updateJobnumPreview();
   var modal = document.getElementById('defaultsModal');
   if (modal) modal.classList.add('open');
   setTimeout(function() { if (e) e.focus(); }, 0);
@@ -979,6 +1002,7 @@ function clearDefaults() {
   if (td) td.checked = false;
   var jc = document.getElementById('def_jobnum_counter');
   if (jc) jc.value = '1';
+  _updateJobnumPreview();
 }
 
 // ── Auto-save / restore worksheet data via localStorage ──

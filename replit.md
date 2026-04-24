@@ -39,7 +39,12 @@ Single-page tool for creating professional job estimates with:
   pre-fills Due Date as today + N days. Edited via the "Defaults..."
   button. Pre-fill on first load (when no auto-saved data exists) and
   after Clear Form on the active tab. Per-worksheet edits to those
-  fields do not change the saved defaults.
+  fields do not change the saved defaults. The Defaults dialog also
+  shows a live read-only preview of the resolved Job Number under the
+  template field, computed from the current template and the current
+  "Next counter value" (today's date for date tokens). The preview
+  never consumes the persisted counter and hides itself when the
+  template is empty.
 - `localStorage["martech_defaults_counter_v1"]` — integer counter
   consumed by the `{####}` token in the Job Number template. Increments
   each time a worksheet is pre-filled with a templated job number. The
