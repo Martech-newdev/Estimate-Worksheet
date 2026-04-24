@@ -417,6 +417,59 @@
     text-transform: uppercase; letter-spacing: 0.5px;
     font-family: 'Barlow Condensed', sans-serif; font-weight: 700;
   }
+  .cust-actions-bar {
+    display: flex; justify-content: flex-end; gap: 8px;
+    margin-bottom: 10px;
+  }
+  /* Import customers dialog */
+  textarea#importCustText {
+    width: 100%; min-height: 120px; padding: 6px 8px;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 12px; border: 1.5px solid #aaa; border-radius: 2px;
+    outline: none; resize: vertical; box-sizing: border-box;
+  }
+  textarea#importCustText:focus { border-color: #1a5276; }
+  .cust-import-file-row input[type=file] {
+    font-family: 'Barlow', sans-serif; font-size: 12px;
+    width: 100%;
+  }
+  .cust-import-preview {
+    margin-top: 8px;
+    border: 1px solid #d4d4d4; border-radius: 3px;
+    background: #fafafa;
+    max-height: 200px; overflow-y: auto;
+    font-size: 12px;
+  }
+  .cust-import-preview-empty {
+    padding: 10px 12px; color: #777; font-style: italic; font-size: 12px;
+  }
+  .cust-import-summary {
+    padding: 8px 12px; background: #fff; border-bottom: 1px solid #e3e3e3;
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.5px; font-size: 12px; color: #555;
+  }
+  .cust-import-warning {
+    padding: 6px 12px; background: #fff8e1; color: #874c00;
+    border-bottom: 1px solid #f0d8a8; font-size: 12px;
+  }
+  .cust-import-row {
+    padding: 6px 12px; border-bottom: 1px solid #eee; line-height: 1.35;
+    background: #fff;
+  }
+  .cust-import-row:last-child { border-bottom: none; }
+  .cust-import-row .cust-import-name { font-weight: 700; color: #1a5276; }
+  .cust-import-row .cust-import-meta { color: #555; font-size: 11px; display: block; margin-top: 1px; }
+  .cust-import-row.cust-import-skip { background: #fbf3ed; }
+  .cust-import-row.cust-import-skip .cust-import-name { color: #874c00; }
+  .cust-import-tag {
+    display: inline-block; margin-left: 6px;
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;
+    padding: 1px 5px; border-radius: 2px; vertical-align: 1px;
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700;
+  }
+  .cust-import-tag-new    { background: #e3f1e7; color: #1e8449; }
+  .cust-import-tag-merge  { background: #fff3cd; color: #856404; }
+  .cust-import-tag-skip   { background: #f5d2bd; color: #874c00; }
 
   @media print {
     body { background:#fff; padding:0; }
@@ -726,11 +779,42 @@
   <div class="modal-card wide">
     <div class="modal-head" id="customersModalTitle">Customers</div>
     <div class="modal-body">
-      <div class="hint">Customers shown here are collected from your saved worksheets. Edit fixes typos and updates the contact info used to autofill new quotes; Merge consolidates two entries by renaming one across all saved worksheets; Delete removes the customer from the suggestion dropdown (and optionally clears its info from saved worksheets).</div>
+      <div class="hint">Customers shown here are collected from your saved worksheets and any list you've imported. Edit fixes typos and updates the contact info used to autofill new quotes; Merge consolidates two entries by renaming one across all saved worksheets; Delete removes the customer from the suggestion dropdown (and optionally clears its info from saved worksheets). Use Import Customers to seed the dropdown from a pasted list or CSV.</div>
+      <div class="cust-actions-bar">
+        <button class="btn btn-blue" onclick="openImportCustomersDialog()">Import Customers...</button>
+      </div>
       <div class="cust-list" id="customersList"></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-blue" onclick="closeCustomersDialog()">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="importCustomersModal" role="dialog" aria-modal="true" aria-labelledby="importCustomersModalTitle">
+  <div class="modal-card wide">
+    <div class="modal-head" id="importCustomersModalTitle">Import Customers</div>
+    <div class="modal-body">
+      <div class="hint">
+        Paste rows below or upload a CSV/TSV file. Expected columns (in order, or use a header row):
+        <strong>Name</strong>, Address Line 1, City/State/Zip, Contact, Contact Email.
+        Tabs or commas are auto-detected; quoted fields are supported. Lines starting with <code>#</code> are skipped. Names matching existing customers (case-insensitive) are merged into the existing entry instead of duplicated.
+      </div>
+      <div class="modal-field">
+        <label for="importCustText">Paste rows (CSV or TSV)</label>
+        <textarea id="importCustText" rows="8" spellcheck="false" placeholder="Acme Corp, 123 Main St, Lodi CA 95242, Jane Smith, jane@acme.com&#10;Beta Industries, 456 Oak Ave, Stockton CA 95202, Bob Lee, bob@beta.com"></textarea>
+      </div>
+      <div class="modal-field cust-import-file-row">
+        <label for="importCustFile">…or upload a CSV file</label>
+        <input type="file" id="importCustFile" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain">
+      </div>
+      <div class="cust-import-preview" id="importCustPreview">
+        <div class="cust-import-preview-empty">Paste rows or pick a file to see a preview.</div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-blue" onclick="closeImportCustomersDialog()">Cancel</button>
+      <button class="btn btn-green" id="importCustRunBtn" onclick="runCustomerImport()" disabled>Import</button>
     </div>
   </div>
 </div>
@@ -1288,14 +1372,27 @@ function updateSaveStatus(flash) {
   }
 }
 
+// Element ids that live in the page but are NOT part of the worksheet
+// payload (control widgets, scratch areas in modals, etc). Anything
+// matching this should be skipped during save/restore/wipe AND should not
+// trigger autosave or dirty-state changes when edited.
+function _isWorksheetField(el) {
+  if (!el || !el.id) return false;
+  if (el.type === 'button' || el.type === 'submit' || el.type === 'file') return false;
+  var id = el.id;
+  if (id === 'wsPicker' || id === 'importFile') return false;
+  if (id.indexOf('def_') === 0) return false;          // Defaults dialog
+  if (id.indexOf('importCust') === 0) return false;    // Import Customers dialog
+  if (id.indexOf('cust_') === 0) return false;         // Customers dialog edit/merge/delete forms
+  return true;
+}
+
 function collectFormData() {
   var data = {};
   var els = document.querySelectorAll('input[id], textarea[id], select[id]');
   for (var i = 0; i < els.length; i++) {
     var el = els[i];
-    if (el.type === 'button' || el.type === 'submit' || el.type === 'file') continue;
-    if (el.id === 'wsPicker' || el.id === 'importFile') continue;
-    if (el.id.indexOf('def_') === 0) continue;
+    if (!_isWorksheetField(el)) continue;
     data[el.id] = el.value;
   }
   return data;
@@ -1365,8 +1462,7 @@ function importFromFile(ev) {
       var els = document.querySelectorAll('input[id], textarea[id], select[id]');
       for (var i = 0; i < els.length; i++) {
         var el = els[i];
-        if (el.type === 'button' || el.type === 'submit' || el.type === 'file') continue;
-        if (el.id && el.id.indexOf('def_') === 0) continue;
+        if (!_isWorksheetField(el)) continue;
         if (el.tagName === 'SELECT') { el.selectedIndex = 0; } else { el.value = ''; }
       }
       applyFormData(data);
@@ -1529,6 +1625,65 @@ function refreshWorksheetPicker() {
 // ── Customer suggestions: pull recent customers from the worksheet library ──
 var CUSTOMER_PREFIXES = ['a', 'b'];
 var CUSTOMER_EXCLUSIONS_KEY = 'martech_customer_exclusions_v1';
+var IMPORTED_CUSTOMERS_KEY = 'martech_imported_customers_v1';
+
+function _readImportedCustomers() {
+  if (!_storageAvailable) return {};
+  try {
+    var raw = localStorage.getItem(IMPORTED_CUSTOMERS_KEY);
+    if (!raw) return {};
+    var arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return {};
+    var out = {};
+    for (var i = 0; i < arr.length; i++) {
+      var c = arr[i];
+      if (!c || typeof c !== 'object') continue;
+      var nm = (c.name || '').trim();
+      if (!nm) continue;
+      var k = nm.toLowerCase();
+      out[k] = {
+        name: nm,
+        addr1: (c.addr1 || '').trim(),
+        addr2: (c.addr2 || '').trim(),
+        contact: (c.contact || '').trim(),
+        contact_email: (c.contact_email || '').trim(),
+        importedAt: c.importedAt || ''
+      };
+    }
+    return out;
+  } catch (e) { return {}; }
+}
+
+function _writeImportedCustomers(map) {
+  if (!_storageAvailable) return false;
+  try {
+    var arr = [];
+    for (var k in map) {
+      if (!Object.prototype.hasOwnProperty.call(map, k)) continue;
+      var c = map[k];
+      if (!c || !c.name) continue;
+      arr.push({
+        name: c.name,
+        addr1: c.addr1 || '',
+        addr2: c.addr2 || '',
+        contact: c.contact || '',
+        contact_email: c.contact_email || '',
+        importedAt: c.importedAt || new Date().toISOString()
+      });
+    }
+    localStorage.setItem(IMPORTED_CUSTOMERS_KEY, JSON.stringify(arr));
+    return true;
+  } catch (e) {
+    alert('Could not save imported customers — browser storage is full or unavailable.');
+    return false;
+  }
+}
+
+function _importedAtMs(entry) {
+  if (!entry || !entry.importedAt) return 0;
+  var t = Date.parse(entry.importedAt);
+  return isNaN(t) ? 0 : t;
+}
 
 function _readCustomerExclusions() {
   if (!_storageAvailable) return {};
@@ -1569,9 +1724,30 @@ function _autoUnexcludeFromData(data) {
   if (changed) _writeCustomerExclusions(ex);
 }
 
+function _mergeSuggestionCandidate(byKey, key, cand) {
+  var prev = byKey[key];
+  if (!prev) { byKey[key] = cand; return; }
+  // Newer entry wins for display name and is the base; fill any blank
+  // contact/address fields from the older entry so we keep the most
+  // complete picture of that customer.
+  if (cand.savedAt >= prev.savedAt) {
+    if (!cand.addr1 && prev.addr1) cand.addr1 = prev.addr1;
+    if (!cand.addr2 && prev.addr2) cand.addr2 = prev.addr2;
+    if (!cand.contact && prev.contact) cand.contact = prev.contact;
+    if (!cand.contact_email && prev.contact_email) cand.contact_email = prev.contact_email;
+    byKey[key] = cand;
+  } else {
+    if (!prev.addr1 && cand.addr1) prev.addr1 = cand.addr1;
+    if (!prev.addr2 && cand.addr2) prev.addr2 = cand.addr2;
+    if (!prev.contact && cand.contact) prev.contact = cand.contact;
+    if (!prev.contact_email && cand.contact_email) prev.contact_email = cand.contact_email;
+  }
+}
+
 function _collectCustomerSuggestions() {
   var lib = _readLibrary();
   var excluded = _readCustomerExclusions();
+  var imported = _readImportedCustomers();
   var byKey = {}; // normalized name -> { name, addr1, addr2, contact, contact_email, savedAt }
   var names = Object.keys(lib.items);
   for (var i = 0; i < names.length; i++) {
@@ -1584,32 +1760,26 @@ function _collectCustomerSuggestions() {
       if (!nm) continue;
       var key = nm.toLowerCase();
       if (excluded[key]) continue;
-      var cand = {
+      _mergeSuggestionCandidate(byKey, key, {
         name: nm,
         addr1: (entry.data[pre + '_addr1'] || '').trim(),
         addr2: (entry.data[pre + '_addr2'] || '').trim(),
         contact: (entry.data[pre + '_contact'] || '').trim(),
         contact_email: (entry.data[pre + '_contact_email'] || '').trim(),
         savedAt: ms
-      };
-      var prev = byKey[key];
-      if (!prev) { byKey[key] = cand; continue; }
-      // Newer entry wins for display name and is the base; fill any blank
-      // contact/address fields from the older entry so we keep the most
-      // complete picture of that customer.
-      if (cand.savedAt >= prev.savedAt) {
-        if (!cand.addr1 && prev.addr1) cand.addr1 = prev.addr1;
-        if (!cand.addr2 && prev.addr2) cand.addr2 = prev.addr2;
-        if (!cand.contact && prev.contact) cand.contact = prev.contact;
-        if (!cand.contact_email && prev.contact_email) cand.contact_email = prev.contact_email;
-        byKey[key] = cand;
-      } else {
-        if (!prev.addr1 && cand.addr1) prev.addr1 = cand.addr1;
-        if (!prev.addr2 && cand.addr2) prev.addr2 = cand.addr2;
-        if (!prev.contact && cand.contact) prev.contact = cand.contact;
-        if (!prev.contact_email && cand.contact_email) prev.contact_email = cand.contact_email;
-      }
+      });
     }
+  }
+  for (var ik in imported) {
+    if (!Object.prototype.hasOwnProperty.call(imported, ik)) continue;
+    if (excluded[ik]) continue;
+    var ic = imported[ik];
+    _mergeSuggestionCandidate(byKey, ik, {
+      name: ic.name,
+      addr1: ic.addr1, addr2: ic.addr2,
+      contact: ic.contact, contact_email: ic.contact_email,
+      savedAt: _importedAtMs(ic)
+    });
   }
   var list = [];
   for (var k in byKey) if (Object.prototype.hasOwnProperty.call(byKey, k)) list.push(byKey[k]);
@@ -1678,9 +1848,42 @@ var _editingCustomerKey = null;
 var _customerActionMode = null; // 'edit' | 'merge' | 'delete'
 var _expandedCustomerKeys = {}; // customer key -> true when its job list is expanded
 
+function _mergeManagementCandidate(byKey, key, cand, excluded, opts) {
+  var prev = byKey[key];
+  if (!prev) {
+    byKey[key] = {
+      key: key,
+      name: cand.name,
+      addr1: cand.addr1, addr2: cand.addr2,
+      contact: cand.contact, contact_email: cand.contact_email,
+      savedAt: cand.savedAt,
+      excluded: !!excluded[key],
+      imported: !!(opts && opts.imported),
+      worksheets: {}
+    };
+  } else {
+    if (cand.savedAt >= prev.savedAt) {
+      prev.name = cand.name;
+      prev.savedAt = cand.savedAt;
+      if (cand.addr1) prev.addr1 = cand.addr1;
+      if (cand.addr2) prev.addr2 = cand.addr2;
+      if (cand.contact) prev.contact = cand.contact;
+      if (cand.contact_email) prev.contact_email = cand.contact_email;
+    } else {
+      if (!prev.addr1 && cand.addr1) prev.addr1 = cand.addr1;
+      if (!prev.addr2 && cand.addr2) prev.addr2 = cand.addr2;
+      if (!prev.contact && cand.contact) prev.contact = cand.contact;
+      if (!prev.contact_email && cand.contact_email) prev.contact_email = cand.contact_email;
+    }
+    if (opts && opts.imported) prev.imported = true;
+  }
+  return byKey[key];
+}
+
 function _collectCustomersForManagement() {
   var lib = _readLibrary();
   var excluded = _readCustomerExclusions();
+  var imported = _readImportedCustomers();
   var byKey = {};
   var names = Object.keys(lib.items);
   for (var i = 0; i < names.length; i++) {
@@ -1692,41 +1895,14 @@ function _collectCustomersForManagement() {
       var nm = (entry.data[pre + '_cust'] || '').trim();
       if (!nm) continue;
       var key = nm.toLowerCase();
-      var cand = {
+      var prev = _mergeManagementCandidate(byKey, key, {
         name: nm,
         addr1: (entry.data[pre + '_addr1'] || '').trim(),
         addr2: (entry.data[pre + '_addr2'] || '').trim(),
         contact: (entry.data[pre + '_contact'] || '').trim(),
         contact_email: (entry.data[pre + '_contact_email'] || '').trim(),
         savedAt: ms
-      };
-      var prev = byKey[key];
-      if (!prev) {
-        byKey[key] = {
-          key: key,
-          name: cand.name,
-          addr1: cand.addr1, addr2: cand.addr2,
-          contact: cand.contact, contact_email: cand.contact_email,
-          savedAt: cand.savedAt,
-          excluded: !!excluded[key],
-          worksheets: {}
-        };
-        prev = byKey[key];
-      } else {
-        if (cand.savedAt >= prev.savedAt) {
-          prev.name = cand.name;
-          prev.savedAt = cand.savedAt;
-          if (cand.addr1) prev.addr1 = cand.addr1;
-          if (cand.addr2) prev.addr2 = cand.addr2;
-          if (cand.contact) prev.contact = cand.contact;
-          if (cand.contact_email) prev.contact_email = cand.contact_email;
-        } else {
-          if (!prev.addr1 && cand.addr1) prev.addr1 = cand.addr1;
-          if (!prev.addr2 && cand.addr2) prev.addr2 = cand.addr2;
-          if (!prev.contact && cand.contact) prev.contact = cand.contact;
-          if (!prev.contact_email && cand.contact_email) prev.contact_email = cand.contact_email;
-        }
-      }
+      }, excluded);
       if (!prev.worksheets[names[i]]) {
         prev.worksheets[names[i]] = {
           name: names[i],
@@ -1741,6 +1917,16 @@ function _collectCustomersForManagement() {
         if (!existingWs.project) existingWs.project = (entry.data[pre + '_proj']   || '').trim();
       }
     }
+  }
+  for (var ik in imported) {
+    if (!Object.prototype.hasOwnProperty.call(imported, ik)) continue;
+    var ic = imported[ik];
+    _mergeManagementCandidate(byKey, ik, {
+      name: ic.name,
+      addr1: ic.addr1, addr2: ic.addr2,
+      contact: ic.contact, contact_email: ic.contact_email,
+      savedAt: _importedAtMs(ic)
+    }, excluded, { imported: true });
   }
   var list = [];
   for (var k in byKey) {
@@ -1828,6 +2014,37 @@ function _updateCustomerInfoInLibrary(oldKey, info) {
   }
   if (changed > 0) _writeLibrary(lib);
   return changed;
+}
+
+function _renameImportedCustomer(oldKey, info) {
+  // Keep the imported store in sync with an edit: rename the entry from oldKey
+  // to newKey and apply the new info. If oldKey isn't in the imported store,
+  // we only touch newKey when it already exists there (so the imported entry
+  // stays in sync after a worksheet-only customer is renamed into an existing
+  // imported one). Returns true if the imported store was modified.
+  var imp = _readImportedCustomers();
+  var newKey = (info.name || '').trim().toLowerCase();
+  if (!newKey) return false;
+  var hadOld = !!imp[oldKey];
+  var hadNew = (newKey !== oldKey) && !!imp[newKey];
+  if (!hadOld && !hadNew) return false;
+  if (hadOld && newKey !== oldKey) delete imp[oldKey];
+  imp[newKey] = {
+    name: info.name,
+    addr1: info.addr1 || '',
+    addr2: info.addr2 || '',
+    contact: info.contact || '',
+    contact_email: info.contact_email || '',
+    importedAt: new Date().toISOString()
+  };
+  return _writeImportedCustomers(imp);
+}
+
+function _removeImportedCustomer(key) {
+  var imp = _readImportedCustomers();
+  if (!imp[key]) return false;
+  delete imp[key];
+  return _writeImportedCustomers(imp);
 }
 
 function _clearCustomerFromLibrary(key, alsoClearInfo) {
@@ -2075,9 +2292,18 @@ function _renderCustomerMergeForm(c, list) {
 function _renderCustomerDeleteForm(c) {
   var n = c.worksheetCount;
   var keyAttr = _escAttr(c.key);
-  var labelText = n === 1
-    ? 'Also clear this customer\'s name and contact info from the 1 saved worksheet that uses it. (Without this, saved worksheets keep their data and you can Restore the customer later.)'
-    : 'Also clear this customer\'s name and contact info from all ' + n + ' saved worksheets that use it. (Without this, saved worksheets keep their data and you can Restore the customer later.)';
+  var labelText;
+  if (n === 0 && c.imported) {
+    labelText = 'Also permanently remove this imported customer entry. (Without this, you can Restore them later.)';
+  } else if (n === 1) {
+    labelText = 'Also clear this customer\'s name and contact info from the 1 saved worksheet that uses it' +
+      (c.imported ? ', and permanently remove the imported customer entry' : '') +
+      '. (Without this, saved worksheets keep their data and you can Restore the customer later.)';
+  } else {
+    labelText = 'Also clear this customer\'s name and contact info from all ' + n + ' saved worksheets that use it' +
+      (c.imported ? ', and permanently remove the imported customer entry' : '') +
+      '. (Without this, saved worksheets keep their data and you can Restore the customer later.)';
+  }
   return '<div class="cust-delete-row">' +
     '<div class="cust-del-msg">Remove "' + _escHtml(c.name) + '" from the customer suggestion dropdown?</div>' +
     '<label><input type="checkbox" id="cust_del_clear_info"> ' + _escHtml(labelText) + '</label>' +
@@ -2181,6 +2407,8 @@ function saveCustomerEdit(key) {
   if (mergingIntoExisting) {
     changed += _updateCustomerInfoInLibrary(newKey, info);
   }
+  // Keep the imported-customers store in sync with the rename/info edit.
+  _renameImportedCustomer(key, info);
   var ex = _readCustomerExclusions();
   var exChanged = false;
   if (ex[key])    { delete ex[key];    exChanged = true; }
@@ -2210,6 +2438,9 @@ function saveCustomerMerge(srcKey) {
   if (!src || !tgt) { alert('That customer no longer exists.'); cancelCustomerAction(); return; }
   if (!confirm('Merge "' + src.name + '" into "' + tgt.name + '"?\n\nAll ' + src.worksheetCount + ' worksheet' + (src.worksheetCount === 1 ? '' : 's') + ' that use "' + src.name + '" will be renamed to "' + tgt.name + '". The address and contact info on those worksheets is left untouched.')) return;
   var changed = _renameCustomerInLibrary(srcKey, tgt.name);
+  // Source customer is gone after the merge — drop its imported-store entry too
+  // so it doesn't reappear in the dropdown under the old name.
+  _removeImportedCustomer(srcKey);
   var ex = _readCustomerExclusions();
   if (ex[srcKey]) { delete ex[srcKey]; _writeCustomerExclusions(ex); }
   _applyCustomerChangesToActiveForm(srcKey, { name: tgt.name }, 'rename');
@@ -2229,8 +2460,10 @@ function confirmCustomerDelete(key) {
   if (!c) { cancelCustomerAction(); return; }
   var alsoClear = !!(document.getElementById('cust_del_clear_info') || {}).checked;
   var changed = 0;
+  var removedImport = false;
   if (alsoClear) {
     changed = _clearCustomerFromLibrary(key, true);
+    removedImport = _removeImportedCustomer(key);
     var ex = _readCustomerExclusions();
     if (ex[key]) { delete ex[key]; _writeCustomerExclusions(ex); }
     _applyCustomerChangesToActiveForm(key, { alsoClearInfo: true }, 'clear');
@@ -2247,9 +2480,20 @@ function confirmCustomerDelete(key) {
   _editingCustomerKey = null;
   _customerActionMode = null;
   renderCustomersList();
-  flashActionMessage(alsoClear
-    ? 'Cleared "' + c.name + '" from ' + changed + ' worksheet' + (changed === 1 ? '' : 's')
-    : 'Hid "' + c.name + '" from suggestions');
+  var msg;
+  if (alsoClear) {
+    if (changed > 0) {
+      msg = 'Cleared "' + c.name + '" from ' + changed + ' worksheet' + (changed === 1 ? '' : 's');
+      if (removedImport) msg += ' and removed imported entry';
+    } else if (removedImport) {
+      msg = 'Removed imported customer "' + c.name + '"';
+    } else {
+      msg = 'Removed "' + c.name + '"';
+    }
+  } else {
+    msg = 'Hid "' + c.name + '" from suggestions';
+  }
+  flashActionMessage(msg);
 }
 
 function restoreCustomer(key) {
@@ -2259,6 +2503,382 @@ function restoreCustomer(key) {
   var c = _findCustomerByKey(key);
   renderCustomersList();
   flashActionMessage('Restored "' + (c ? c.name : key) + '" to suggestions');
+}
+
+// ── Customer import dialog ────────────────────────────────────────────────────
+var IMPORT_HEADER_ALIASES = {
+  name:          ['name', 'customer', 'customer name', 'company', 'company name'],
+  addr1:         ['address', 'address line 1', 'address1', 'addr1', 'address 1', 'street', 'street address'],
+  addr2:         ['city/state/zip', 'csz', 'city state zip', 'city, state, zip', 'address line 2', 'address2', 'addr2', 'address 2'],
+  contact:       ['contact', 'contact name', 'attn', 'attention'],
+  contact_email: ['email', 'contact email', 'e-mail', 'email address', 'contact e-mail']
+};
+
+function _isImportHeaderCell(cell) {
+  var h = String(cell || '').trim().toLowerCase();
+  if (!h) return false;
+  for (var k in IMPORT_HEADER_ALIASES) {
+    if (!Object.prototype.hasOwnProperty.call(IMPORT_HEADER_ALIASES, k)) continue;
+    var arr = IMPORT_HEADER_ALIASES[k];
+    for (var i = 0; i < arr.length; i++) if (arr[i] === h) return true;
+  }
+  return false;
+}
+
+function _detectImportColumns(headerCells) {
+  var map = { name: -1, addr1: -1, addr2: -1, contact: -1, contact_email: -1 };
+  for (var i = 0; i < headerCells.length; i++) {
+    var h = String(headerCells[i] || '').trim().toLowerCase();
+    if (!h) continue;
+    for (var k in IMPORT_HEADER_ALIASES) {
+      if (!Object.prototype.hasOwnProperty.call(IMPORT_HEADER_ALIASES, k)) continue;
+      if (map[k] !== -1) continue;
+      var arr = IMPORT_HEADER_ALIASES[k];
+      for (var j = 0; j < arr.length; j++) {
+        if (arr[j] === h) { map[k] = i; break; }
+      }
+    }
+  }
+  return map;
+}
+
+function _parseDelimitedText(text, delim) {
+  // Handles quoted fields (with embedded delimiters and "" escapes) and
+  // multi-line quoted strings. Returns an array of row arrays.
+  var rows = [];
+  var row = [];
+  var cur = '';
+  var inQ = false;
+  var i = 0;
+  var n = text.length;
+  while (i < n) {
+    var ch = text.charAt(i);
+    if (inQ) {
+      if (ch === '"') {
+        if (text.charAt(i + 1) === '"') { cur += '"'; i += 2; continue; }
+        inQ = false; i++; continue;
+      }
+      cur += ch; i++; continue;
+    } else {
+      if (ch === '"' && cur === '') { inQ = true; i++; continue; }
+      if (ch === delim) { row.push(cur); cur = ''; i++; continue; }
+      if (ch === '\r') { i++; continue; }
+      if (ch === '\n') { row.push(cur); rows.push(row); row = []; cur = ''; i++; continue; }
+      cur += ch; i++; continue;
+    }
+  }
+  if (cur.length > 0 || row.length > 0) { row.push(cur); rows.push(row); }
+  return rows;
+}
+
+function _parseCustomerImport(text) {
+  var result = { rows: [], warnings: [], delim: 'comma', hasHeader: false, totalLines: 0 };
+  if (!text || !text.trim()) return result;
+  // Auto-detect delimiter: tab if any tab outside comments, else comma.
+  var hasTab = false;
+  var lines = text.split(/\r?\n/);
+  for (var li = 0; li < lines.length; li++) {
+    var ln = lines[li];
+    if (!ln || ln.charAt(0) === '#') continue;
+    if (ln.indexOf('\t') !== -1) { hasTab = true; break; }
+  }
+  var delim = hasTab ? '\t' : ',';
+  result.delim = hasTab ? 'tab' : 'comma';
+  // Strip out comment lines before passing to the parser. A line is a comment
+  // when its first non-whitespace character is # AND we are not currently
+  // inside a quoted multi-line cell (so a continuation line of a quoted value
+  // that happens to start with # is preserved verbatim).
+  var filtered = [];
+  var inQuote = false;
+  for (var k = 0; k < lines.length; k++) {
+    var s = lines[k];
+    if (!inQuote) {
+      var trimmed = s.replace(/^[\s\uFEFF]+/, '');
+      if (trimmed.length && trimmed.charAt(0) === '#') continue;
+    }
+    filtered.push(s);
+    // Toggle quote state by counting unescaped " in this line. A doubled "" is
+    // an escape; we count single quotes by stripping doubles first.
+    var stripped = s.replace(/""/g, '');
+    var qcount = 0;
+    for (var qi = 0; qi < stripped.length; qi++) if (stripped.charAt(qi) === '"') qcount++;
+    if (qcount % 2 === 1) inQuote = !inQuote;
+  }
+  var raw = filtered.join('\n');
+  var rows = _parseDelimitedText(raw, delim);
+  // Drop fully-empty trailing rows
+  while (rows.length && rows[rows.length - 1].length === 1 && !rows[rows.length - 1][0].trim()) rows.pop();
+  result.totalLines = rows.length;
+  if (!rows.length) return result;
+  // Header detection
+  var colMap = { name: 0, addr1: 1, addr2: 2, contact: 3, contact_email: 4 };
+  var startIdx = 0;
+  var firstCells = rows[0];
+  var headerHits = 0;
+  for (var fi = 0; fi < firstCells.length; fi++) if (_isImportHeaderCell(firstCells[fi])) headerHits++;
+  if (headerHits >= 1 && headerHits >= Math.min(2, firstCells.length)) {
+    var detected = _detectImportColumns(firstCells);
+    if (detected.name !== -1) {
+      colMap = detected;
+      startIdx = 1;
+      result.hasHeader = true;
+    }
+  } else if (headerHits === 1 && firstCells.length === 1) {
+    // Single-column header like "Name" — still treat as header
+    var detected2 = _detectImportColumns(firstCells);
+    if (detected2.name !== -1) { colMap = detected2; startIdx = 1; result.hasHeader = true; }
+  }
+  function pick(cells, idx) {
+    if (idx < 0 || idx >= cells.length) return '';
+    return (cells[idx] || '').trim();
+  }
+  for (var r = startIdx; r < rows.length; r++) {
+    var cells = rows[r];
+    // Skip empty rows
+    var anyNonEmpty = false;
+    for (var ci = 0; ci < cells.length; ci++) if ((cells[ci] || '').trim()) { anyNonEmpty = true; break; }
+    if (!anyNonEmpty) continue;
+    var name = pick(cells, colMap.name);
+    var entry = {
+      name: name,
+      addr1: pick(cells, colMap.addr1),
+      addr2: pick(cells, colMap.addr2),
+      contact: pick(cells, colMap.contact),
+      contact_email: pick(cells, colMap.contact_email),
+      lineNum: r + 1
+    };
+    if (!name) {
+      entry.action = 'skip';
+      entry.skipReason = 'No name in this row';
+    } else if (name.length > 200) {
+      entry.action = 'skip';
+      entry.skipReason = 'Name is too long (max 200 chars)';
+    } else {
+      entry.action = 'pending'; // resolved later against existing data
+    }
+    result.rows.push(entry);
+  }
+  return result;
+}
+
+function _classifyImportRows(parsed) {
+  // Resolve each non-skip row against existing customers. Marks action as
+  // 'new' (no existing customer with that name) or 'merge' (case-insensitive
+  // match found — fields will fill blanks only). Also dedupes within the
+  // pasted list itself: a later row with the same name as an earlier one
+  // becomes a 'merge' (against the earlier row in this paste).
+  var existing = _collectCustomersForManagement();
+  var existingByKey = {};
+  for (var i = 0; i < existing.length; i++) existingByKey[existing[i].key] = existing[i];
+  var seenKeys = {};
+  for (var r = 0; r < parsed.rows.length; r++) {
+    var row = parsed.rows[r];
+    if (row.action === 'skip') continue;
+    var key = row.name.toLowerCase();
+    if (seenKeys[key]) {
+      row.action = 'merge';
+      row.mergeReason = 'duplicate of earlier row in this list';
+    } else if (existingByKey[key]) {
+      row.action = 'merge';
+      row.mergeReason = 'existing customer "' + existingByKey[key].name + '"';
+    } else {
+      row.action = 'new';
+    }
+    seenKeys[key] = true;
+  }
+  return parsed;
+}
+
+function _renderImportPreview(parsed) {
+  var el = document.getElementById('importCustPreview');
+  var btn = document.getElementById('importCustRunBtn');
+  if (!el) return;
+  if (!parsed || !parsed.rows.length) {
+    el.innerHTML = '<div class="cust-import-preview-empty">Paste rows or pick a file to see a preview.</div>';
+    if (btn) btn.disabled = true;
+    return;
+  }
+  var counts = { new: 0, merge: 0, skip: 0 };
+  for (var i = 0; i < parsed.rows.length; i++) counts[parsed.rows[i].action]++;
+  var summary = '';
+  var bits = [];
+  if (counts.new)   bits.push(counts.new + ' new');
+  if (counts.merge) bits.push(counts.merge + ' merge into existing');
+  if (counts.skip)  bits.push(counts.skip + ' skipped');
+  summary = (parsed.hasHeader ? 'Header row detected. ' : '') +
+    'Detected ' + parsed.delim + '-separated. ' +
+    parsed.rows.length + ' row' + (parsed.rows.length === 1 ? '' : 's') +
+    ' (' + bits.join(', ') + ')';
+  var html = '<div class="cust-import-summary">' + _escHtml(summary) + '</div>';
+  if (counts.new === 0 && counts.merge === 0) {
+    html += '<div class="cust-import-warning">Nothing will be imported. Add at least one row with a name.</div>';
+  }
+  for (var j = 0; j < parsed.rows.length; j++) {
+    var row = parsed.rows[j];
+    var rowCls = 'cust-import-row' + (row.action === 'skip' ? ' cust-import-skip' : '');
+    var tagCls = row.action === 'new' ? 'cust-import-tag-new'
+               : row.action === 'merge' ? 'cust-import-tag-merge'
+               : 'cust-import-tag-skip';
+    var tagText = row.action === 'new' ? 'New'
+                : row.action === 'merge' ? 'Merge'
+                : 'Skip';
+    var titleParts = [];
+    if (row.addr1) titleParts.push(row.addr1);
+    if (row.addr2) titleParts.push(row.addr2);
+    if (row.contact) titleParts.push(row.contact);
+    if (row.contact_email) titleParts.push(row.contact_email);
+    var nameDisplay = row.name ? _escHtml(row.name) : '<em style="color:#999;font-style:italic;">(no name)</em>';
+    var metaText = '';
+    if (row.action === 'skip') {
+      metaText = 'Row ' + row.lineNum + ' — ' + (row.skipReason || 'skipped');
+    } else {
+      metaText = (titleParts.length ? titleParts.join(' \u2022 ') : 'no address or contact');
+      if (row.action === 'merge' && row.mergeReason) {
+        metaText += ' — will fill blanks of ' + row.mergeReason;
+      }
+    }
+    html += '<div class="' + rowCls + '">' +
+      '<span class="cust-import-name">' + nameDisplay + '</span>' +
+      '<span class="cust-import-tag ' + tagCls + '">' + tagText + '</span>' +
+      '<span class="cust-import-meta">' + _escHtml(metaText) + '</span>' +
+    '</div>';
+  }
+  el.innerHTML = html;
+  if (btn) btn.disabled = (counts.new === 0 && counts.merge === 0);
+}
+
+function _refreshImportPreview() {
+  var ta = document.getElementById('importCustText');
+  var text = ta ? ta.value : '';
+  var parsed = _parseCustomerImport(text);
+  _classifyImportRows(parsed);
+  _renderImportPreview(parsed);
+}
+
+var _importCustomersWired = false;
+function _wireImportCustomersHandlers() {
+  if (_importCustomersWired) return;
+  var ta = document.getElementById('importCustText');
+  var fi = document.getElementById('importCustFile');
+  if (ta) ta.addEventListener('input', _refreshImportPreview);
+  if (fi) fi.addEventListener('change', function() {
+    var f = fi.files && fi.files[0];
+    if (!f) return;
+    if (f.size > 1024 * 1024) {
+      alert('That file is larger than 1 MB. Please pick a smaller customer list.');
+      fi.value = '';
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var text = String(e.target.result || '');
+      if (ta) ta.value = text;
+      _refreshImportPreview();
+    };
+    reader.onerror = function() {
+      alert('Could not read that file.');
+    };
+    reader.readAsText(f);
+  });
+  _importCustomersWired = true;
+}
+
+function openImportCustomersDialog() {
+  if (!_storageAvailable) {
+    alert('Customer import isn\'t available — browser storage is unavailable.');
+    return;
+  }
+  var modal = document.getElementById('importCustomersModal');
+  if (!modal) return;
+  var ta = document.getElementById('importCustText');
+  var fi = document.getElementById('importCustFile');
+  if (ta) ta.value = '';
+  if (fi) fi.value = '';
+  _wireImportCustomersHandlers();
+  _refreshImportPreview();
+  modal.classList.add('open');
+  setTimeout(function() { if (ta) ta.focus(); }, 0);
+}
+
+function closeImportCustomersDialog() {
+  var modal = document.getElementById('importCustomersModal');
+  if (modal) modal.classList.remove('open');
+}
+
+function runCustomerImport() {
+  var ta = document.getElementById('importCustText');
+  var text = ta ? ta.value : '';
+  var parsed = _parseCustomerImport(text);
+  _classifyImportRows(parsed);
+  var addable = [];
+  for (var i = 0; i < parsed.rows.length; i++) {
+    var r = parsed.rows[i];
+    if (r.action === 'new' || r.action === 'merge') addable.push(r);
+  }
+  if (!addable.length) {
+    alert('Nothing to import. Paste at least one row with a name.');
+    return;
+  }
+  // Apply: build the imported store + auto-unexclude any names being imported.
+  var imp = _readImportedCustomers();
+  var existing = _collectCustomersForManagement();
+  var existingByKey = {};
+  for (var e = 0; e < existing.length; e++) existingByKey[existing[e].key] = existing[e];
+  var ex = _readCustomerExclusions();
+  var exChanged = false;
+  var nowIso = new Date().toISOString();
+  var added = 0, merged = 0;
+  for (var j = 0; j < addable.length; j++) {
+    var row = addable[j];
+    var key = row.name.toLowerCase();
+    if (ex[key]) { delete ex[key]; exChanged = true; }
+    var prevImp = imp[key];
+    var existingCust = existingByKey[key];
+    // Determine the merged values for the imported store entry: never overwrite
+    // a non-blank existing value (worksheet- or import-derived); fill blanks
+    // from the row.
+    var base = prevImp || {
+      name: existingCust ? existingCust.name : row.name,
+      addr1: existingCust ? existingCust.addr1 : '',
+      addr2: existingCust ? existingCust.addr2 : '',
+      contact: existingCust ? existingCust.contact : '',
+      contact_email: existingCust ? existingCust.contact_email : ''
+    };
+    var next = {
+      name: base.name || row.name,
+      addr1: base.addr1 || row.addr1 || '',
+      addr2: base.addr2 || row.addr2 || '',
+      contact: base.contact || row.contact || '',
+      contact_email: base.contact_email || row.contact_email || '',
+      importedAt: nowIso
+    };
+    imp[key] = next;
+    if (existingCust || prevImp) merged++;
+    else added++;
+  }
+  if (!_writeImportedCustomers(imp)) {
+    // Storage full / unavailable — keep modal open, show an inline error,
+    // and do not claim success or refresh anything else.
+    var prev = document.getElementById('importCustomersModal');
+    if (prev) {
+      var preview = document.getElementById('importCustPreview');
+      if (preview) {
+        preview.innerHTML = '<div class="cust-import-summary" style="color:#b00020">' +
+          'Could not save imported customers — your browser storage may be full. ' +
+          'Free up space (or remove some saved worksheets) and try again.' +
+          '</div>';
+      }
+    }
+    return;
+  }
+  if (exChanged) _writeCustomerExclusions(ex);
+  refreshCustomerDatalist();
+  renderCustomersList();
+  closeImportCustomersDialog();
+  var msgBits = [];
+  if (added)  msgBits.push('Added ' + added + ' new customer' + (added === 1 ? '' : 's'));
+  if (merged) msgBits.push('merged into ' + merged + ' existing');
+  flashActionMessage(msgBits.join(', '));
 }
 
 function onPickerChange(sel) {
@@ -2282,7 +2902,7 @@ function loadWorksheetByName(name) {
   var els = document.querySelectorAll('input[id], textarea[id], select[id]');
   for (var i = 0; i < els.length; i++) {
     var el = els[i];
-    if (el.type === 'button' || el.type === 'submit' || el.type === 'file') continue;
+    if (!_isWorksheetField(el)) continue;
     if (el.tagName === 'SELECT') { el.selectedIndex = 0; } else { el.value = ''; }
   }
   applyFormData(entry.data || {});
@@ -2490,11 +3110,15 @@ function deleteCurrentWorksheet() {
 
 document.addEventListener('input', function(e) {
   var t = e.target;
-  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) scheduleSave();
+  if (!t || (t.tagName !== 'INPUT' && t.tagName !== 'TEXTAREA')) return;
+  if (t.id && !_isWorksheetField(t)) return;
+  scheduleSave();
 });
 document.addEventListener('change', function(e) {
   var t = e.target;
-  if (t && t.tagName === 'SELECT' && t.id !== 'wsPicker') scheduleSave();
+  if (!t || t.tagName !== 'SELECT') return;
+  if (t.id && !_isWorksheetField(t)) return;
+  scheduleSave();
 });
 
 window.onload = function() {

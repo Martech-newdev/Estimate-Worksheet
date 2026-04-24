@@ -27,7 +27,9 @@ Single-page tool for creating professional job estimates with:
   project name, relative save date, with the currently-loaded one tagged).
   Clicking a worksheet entry loads it (same dirty-prompt as the picker)
   and closes the dialog; the list is also shown for hidden customers so
-  old worksheets can be cleaned up before un-hiding. Each row supports
+  old worksheets can be cleaned up before un-hiding. Imported customers
+  (see below) also appear here with a "Used in 0 saved worksheets" count
+  until a worksheet references them. Each row supports
   Edit (rename + update the four contact fields across every matching
   saved worksheet, with merge confirmation when renaming into an existing
   customer), Merge (renames the customer to a chosen target across every
@@ -39,6 +41,18 @@ Single-page tool for creating professional job estimates with:
   worksheet whose Customer field matches an excluded name automatically
   un-excludes it. All edits update the dropdown and the active form
   immediately without a reload.
+- An "Import Customers..." action inside the Customers dialog seeds the
+  dropdown from a pasted list or a small CSV/TSV file. Expected columns
+  (in order, or via a header row) are Name, Address Line 1,
+  City/State/Zip, Contact, Contact Email. Tab vs. comma is auto-detected,
+  quoted fields are supported, and lines starting with `#` are skipped.
+  A live preview tags each row as New, Merge (case-insensitive name match
+  with an existing customer fills only blank fields, never overwrites),
+  or Skip (rows missing a name). Imported customers persist in their own
+  localStorage key and the dropdown picks them up immediately. Edit /
+  Merge / Delete on an imported customer keep the imported store in sync
+  (rename re-keys the imported entry; merge drops the source imported
+  entry; delete with the "also clear" checkbox permanently removes it).
 
 ## Storage
 
@@ -72,6 +86,15 @@ Single-page tool for creating professional job estimates with:
   each time a worksheet is pre-filled with a templated job number. The
   next value is shown and editable in the Defaults dialog; cleared to 1
   by Clear Defaults.
+- `localStorage["martech_imported_customers_v1"]` — JSON array of
+  customers seeded via the Customers dialog's "Import Customers..."
+  action: `[{ name, addr1, addr2, contact, contact_email, importedAt }, ...]`.
+  Read alongside the worksheet-derived customers to populate the
+  Customer suggestion dropdown and the Customers dialog. Names are
+  case-insensitive unique; running the import again with the same name
+  fills only blank fields (existing values are never overwritten).
+  Editing/Merging/Deleting from the Customers dialog keeps this store
+  in sync.
 - `localStorage["martech_customer_exclusions_v1"]` — JSON array of
   lowercase customer names hidden from the Customer suggestion dropdown
   via the Customers dialog's Delete action. The Customers dialog still
