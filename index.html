@@ -734,7 +734,7 @@ function generateQuote() {
   ch.push(blank());
 
   // Date + quote number
-  ch.push(para([run(qdate || 'Date: ___________')]));
+  ch.push(para([run('Date:\u00a0\u00a0' + (qdate || '___________'))]));
   if (jobnum) ch.push(para([run('(Quote #' + jobnum + ')')], { spaceAfter: 80 }));
   ch.push(blank());
 
@@ -782,9 +782,8 @@ function generateQuote() {
   ch.push(blank());
   ch.push(blank());
 
-  // Signature block
-  var sigName = estimator || 'Ron Stephens';
-  ch.push(para([run(sigName, { bold: true })], { spaceAfter: 60 }));
+  // Signature block — always Ron Stephens as the standard MarTech signatory
+  ch.push(para([run('Ron Stephens', { bold: true })], { spaceAfter: 60 }));
   ch.push(para([run('General Manager')], { spaceAfter: 60 }));
   ch.push(para([run('Rons@mar-tech.com')], { spaceAfter: 60 }));
   ch.push(para([run('(209) 333-8478 Main')], { spaceAfter: 60 }));
