@@ -1456,11 +1456,44 @@ function _hasAnyData() {
   return false;
 }
 
+function _findDuplicateJobNumberNames(lib, jobnum, excludeName) {
+  var matches = [];
+  if (!jobnum) return matches;
+  var target = String(jobnum).trim();
+  if (!target) return matches;
+  var targetLower = target.toLowerCase();
+  for (var k in lib.items) {
+    if (!Object.prototype.hasOwnProperty.call(lib.items, k)) continue;
+    if (k === excludeName) continue;
+    var entry = lib.items[k];
+    var d = (entry && entry.data) || {};
+    var jn = String((d['a_jobnum'] || d['b_jobnum'] || '')).trim();
+    if (jn && jn.toLowerCase() === targetLower) matches.push(k);
+  }
+  return matches;
+}
+
+function _confirmDuplicateJobNumber(lib, data, excludeName) {
+  var jobnum = String((data['a_jobnum'] || data['b_jobnum'] || '')).trim();
+  if (!jobnum) return true;
+  var dupes = _findDuplicateJobNumberNames(lib, jobnum, excludeName);
+  if (!dupes.length) return true;
+  var listed = dupes.slice(0, 3).map(function(n) { return '• "' + n + '"'; }).join('\n');
+  if (dupes.length > 3) listed += '\n• …and ' + (dupes.length - 3) + ' more';
+  var msg = 'Job number "' + jobnum + '" is already used by '
+    + (dupes.length === 1 ? 'another saved worksheet:' : dupes.length + ' other saved worksheets:')
+    + '\n\n' + listed
+    + '\n\nSave anyway? Click Cancel to edit the job number first.';
+  return confirm(msg);
+}
+
 function saveCurrentWorksheet() {
   if (!_storageAvailable) { alert('Browser storage is unavailable — use Save to File instead.'); return; }
   if (!_currentWorksheetName) { saveWorksheetAs(); return; }
   var lib = _readLibrary();
-  lib.items[_currentWorksheetName] = { data: collectFormData(), savedAt: new Date().toISOString() };
+  var data = collectFormData();
+  if (!_confirmDuplicateJobNumber(lib, data, _currentWorksheetName)) return;
+  lib.items[_currentWorksheetName] = { data: data, savedAt: new Date().toISOString() };
   lib.current = _currentWorksheetName;
   if (!_writeLibrary(lib)) return;
   _baselineSnapshot = _snapshotString();
@@ -1480,7 +1513,9 @@ function saveWorksheetAs() {
   if (lib.items[name] && name !== _currentWorksheetName) {
     if (!confirm('A worksheet named "' + name + '" already exists. Overwrite it?')) return;
   }
-  lib.items[name] = { data: collectFormData(), savedAt: new Date().toISOString() };
+  var data = collectFormData();
+  if (!_confirmDuplicateJobNumber(lib, data, name)) return;
+  lib.items[name] = { data: data, savedAt: new Date().toISOString() };
   lib.current = name;
   if (!_writeLibrary(lib)) return;
   _currentWorksheetName = name;
