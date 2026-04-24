@@ -33,6 +33,18 @@
   .btn-blue  { background: #1a5276; color: #fff; }
   .btn-green { background: #1e8449; color: #fff; }
 
+  .save-status {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 12px; font-weight: 600; letter-spacing: 0.5px;
+    text-transform: uppercase; color: #555;
+    padding: 6px 10px; border-radius: 3px;
+    background: transparent;
+    transition: background-color 0.4s ease, color 0.4s ease;
+    min-width: 140px; text-align: center;
+  }
+  .save-status.flash { background: #d4edda; color: #1e8449; }
+  .save-status.warn  { background: #f8d7da; color: #b02a37; }
+
   .form-card {
     background: #f4f4f2;
     max-width: 1180px; margin: 0 auto 20px;
@@ -218,6 +230,7 @@
   <button class="btn btn-blue" onclick="document.getElementById('importFile').click()">&#128194; Load from File</button>
   <button class="btn btn-dark" onclick="clearForm()">&#8635; Clear Form</button>
   <input type="file" id="importFile" accept=".json,application/json" style="display:none" onchange="importFromFile(event)">
+  <span id="saveStatus" class="save-status" aria-live="polite">Not saved yet</span>
 </div>
 
 <!-- ===== 1-PAGE ===== -->
@@ -579,6 +592,50 @@ function clearForm() {
 // ── Auto-save / restore worksheet data via localStorage ──
 var STORAGE_KEY = 'martech_worksheet_v1';
 var _saveTimer = null;
+var _lastSavedAt = null;
+var _statusFlashTimer = null;
+var _storageAvailable = (function() {
+  try {
+    var k = '__martech_probe__';
+    localStorage.setItem(k, '1');
+    localStorage.removeItem(k);
+    return true;
+  } catch (e) { return false; }
+})();
+
+function _formatSavedAgo(ts) {
+  var sec = Math.max(0, Math.round((Date.now() - ts) / 1000));
+  if (sec < 5)   return 'Saved just now';
+  if (sec < 60)  return 'Saved a few seconds ago';
+  var min = Math.round(sec / 60);
+  if (min === 1) return 'Saved 1 minute ago';
+  if (min < 60)  return 'Saved ' + min + ' minutes ago';
+  var hr = Math.round(min / 60);
+  if (hr === 1)  return 'Saved 1 hour ago';
+  return 'Saved ' + hr + ' hours ago';
+}
+
+function updateSaveStatus(flash) {
+  var el = document.getElementById('saveStatus');
+  if (!el) return;
+  if (!_storageAvailable) {
+    el.textContent = 'Auto-save is off';
+    el.classList.remove('flash');
+    el.classList.add('warn');
+    el.title = 'Browser storage is unavailable — use Save to File to keep your work.';
+    return;
+  }
+  el.classList.remove('warn');
+  if (_lastSavedAt == null) { el.textContent = 'Not saved yet'; return; }
+  el.textContent = _formatSavedAgo(_lastSavedAt);
+  if (flash) {
+    el.classList.add('flash');
+    if (_statusFlashTimer) clearTimeout(_statusFlashTimer);
+    _statusFlashTimer = setTimeout(function() {
+      el.classList.remove('flash');
+    }, 900);
+  }
+}
 
 function collectFormData() {
   var data = {};
@@ -605,9 +662,15 @@ function applyFormData(data) {
 }
 
 function saveForm() {
+  if (!_storageAvailable) { updateSaveStatus(false); return; }
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(collectFormData()));
-  } catch (e) { /* storage unavailable — silently ignore */ }
+    _lastSavedAt = Date.now();
+    updateSaveStatus(true);
+  } catch (e) {
+    _storageAvailable = false;
+    updateSaveStatus(false);
+  }
 }
 
 function exportToFile() {
@@ -689,6 +752,8 @@ window.onload = function() {
   var pages = document.getElementsByClassName('tab-page');
   for (var i = 0; i < pages.length; i++) pages[i].style.display = i === 0 ? 'block' : 'none';
   restoreForm();
+  updateSaveStatus(false);
+  setInterval(function() { updateSaveStatus(false); }, 15000);
 };
 
 function generateQuote() {
