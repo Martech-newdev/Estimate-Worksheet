@@ -45,6 +45,7 @@
   .save-status.flash { background: #d4edda; color: #1e8449; }
   .save-status.warn  { background: #f8d7da; color: #b02a37; }
   .save-status.dirty { background: #fff3cd; color: #8a6d3b; }
+  .save-status.action-flash { background: #d1ecf1; color: #0c5460; }
 
   .ws-picker {
     display: flex; align-items: center; gap: 6px;
@@ -804,7 +805,27 @@ function _formatSavedAgo(ts) {
   return 'Saved ' + hr + ' hours ago';
 }
 
+var _actionFlashTimer = null;
+var _actionFlashActive = false;
+
+function flashActionMessage(msg) {
+  var el = document.getElementById('saveStatus');
+  if (!el) return;
+  if (_actionFlashTimer) { clearTimeout(_actionFlashTimer); _actionFlashTimer = null; }
+  el.classList.remove('flash', 'warn', 'dirty');
+  el.classList.add('action-flash');
+  el.textContent = msg;
+  _actionFlashActive = true;
+  _actionFlashTimer = setTimeout(function() {
+    _actionFlashActive = false;
+    _actionFlashTimer = null;
+    el.classList.remove('action-flash');
+    refreshDirtyIndicator();
+  }, 2500);
+}
+
 function updateSaveStatus(flash) {
+  if (_actionFlashActive) return;
   var el = document.getElementById('saveStatus');
   if (!el) return;
   if (!_storageAvailable) {
@@ -982,6 +1003,7 @@ function isWorksheetDirty() {
 }
 
 function refreshDirtyIndicator() {
+  if (_actionFlashActive) return;
   var el = document.getElementById('saveStatus');
   if (!el || !_storageAvailable) return;
   if (_currentWorksheetName && isWorksheetDirty()) {
@@ -1182,6 +1204,7 @@ function renameCurrentWorksheet() {
   _currentWorksheetName = name;
   refreshWorksheetPicker();
   refreshDirtyIndicator();
+  flashActionMessage('Renamed to "' + name + '"');
 }
 
 function duplicateCurrentWorksheet() {
@@ -1216,6 +1239,7 @@ function duplicateCurrentWorksheet() {
   saveForm();
   refreshWorksheetPicker();
   refreshDirtyIndicator();
+  flashActionMessage('Duplicated as "' + name + '"');
 }
 
 function _uniqueCopyName(base, lib) {
@@ -1234,14 +1258,16 @@ function deleteCurrentWorksheet() {
     return;
   }
   if (!confirm('Delete saved worksheet "' + _currentWorksheetName + '" from your library? The worksheet currently on screen will stay until you reload or clear it.')) return;
+  var deletedName = _currentWorksheetName;
   var lib = _readLibrary();
-  delete lib.items[_currentWorksheetName];
-  if (lib.current === _currentWorksheetName) lib.current = null;
-  _writeLibrary(lib);
+  delete lib.items[deletedName];
+  if (lib.current === deletedName) lib.current = null;
+  if (!_writeLibrary(lib)) return;
   _currentWorksheetName = null;
   _baselineSnapshot = null;
   refreshWorksheetPicker();
   refreshDirtyIndicator();
+  flashActionMessage('Deleted "' + deletedName + '"');
 }
 
 document.addEventListener('input', function(e) {
