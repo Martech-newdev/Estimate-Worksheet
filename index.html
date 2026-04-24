@@ -590,12 +590,13 @@ function generateQuote() {
 
   // Read meta fields
   function gField(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; }
-  var qdate   = gField(p + '_qdate');
-  var cust    = gField(p + '_cust');
-  var contact = gField(p + '_contact');
-  var jobnum  = gField(p + '_jobnum');
-  var proj    = gField(p + '_proj');
-  var notes   = gField(p + '_notes');
+  var qdate     = gField(p + '_qdate');
+  var cust      = gField(p + '_cust');
+  var contact   = gField(p + '_contact');
+  var jobnum    = gField(p + '_jobnum');
+  var proj      = gField(p + '_proj');
+  var estimator = gField(p + '_estimator'); // internal tracking — not shown in letter (signature is always Ron Stephens)
+  var notes     = gField(p + '_notes');
 
   // Read display totals
   function gText(id) { var el = document.getElementById(id); return el ? el.textContent.trim() : '$0.00'; }
@@ -603,19 +604,17 @@ function generateQuote() {
   var matTotal   = gText(p + '_s_mat');
   var grandTotal = gText(p + '_s_tot');
 
-  // Collect scope items from free rows (description filled OR hours/rate entered)
-  // Each entry stores { num: rowLabel, text: description }
+  // Collect scope items — each entry stores { num: rowLabel, text: description }
+  // Free rows: include when description is filled OR hours > 0 (rate alone is not enough)
   var scopeItems = [];
   for (var i = 0; i < freeN; i++) {
     var descEl = document.getElementById(p + '_d_' + i);
     var hrsEl  = document.getElementById(p + '_h_' + i);
-    var rateEl = document.getElementById(p + '_r_' + i);
     var desc = descEl ? descEl.value.trim() : '';
     var hrs  = hrsEl  ? parseFloat(hrsEl.value) : 0;
-    var rate = rateEl ? parseFloat(rateEl.value) : 0;
-    if (desc || hrs > 0 || rate > 0) scopeItems.push({ num: (i + 1) + '.0', text: desc || '(unlabeled task)' });
+    if (desc || hrs > 0) scopeItems.push({ num: (i + 1) + '.0', text: desc || '(unlabeled task)' });
   }
-  // Fixed rows included when hours OR rate is entered — numbered after free rows
+  // Fixed overhead rows: include when hours OR rate is entered (rate-only is meaningful here)
   for (var f = 0; f < 8; f++) {
     var hrsEl  = document.getElementById(p + '_h_f' + f);
     var rateEl = document.getElementById(p + '_r_f' + f);
