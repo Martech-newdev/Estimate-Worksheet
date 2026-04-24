@@ -227,6 +227,8 @@
   <div class="meta-section">
     <div class="meta-row"><span class="meta-label">Quote Date:</span><input class="meta-input" type="text" id="a_qdate" placeholder="MM/DD/YYYY"></div>
     <div class="meta-row"><span class="meta-label">Customer:</span><input class="meta-input" type="text" id="a_cust"></div>
+    <div class="meta-row"><span class="meta-label">Address Line 1:</span><input class="meta-input" type="text" id="a_addr1"></div>
+    <div class="meta-row"><span class="meta-label">City/State/Zip:</span><input class="meta-input" type="text" id="a_addr2"></div>
     <div class="meta-row"><span class="meta-label">Contact:</span><input class="meta-input" type="text" id="a_contact"></div>
     <div class="meta-row"><span class="meta-label">Job Number:</span><input class="meta-input" type="text" id="a_jobnum"></div>
     <div class="meta-row"><span class="meta-label">Project Name:</span><input class="meta-input" type="text" id="a_proj"></div>
@@ -313,6 +315,8 @@
   <div class="meta-section">
     <div class="meta-row"><span class="meta-label">Quote Date:</span><input class="meta-input" type="text" id="b_qdate" placeholder="MM/DD/YYYY"></div>
     <div class="meta-row"><span class="meta-label">Customer:</span><input class="meta-input" type="text" id="b_cust"></div>
+    <div class="meta-row"><span class="meta-label">Address Line 1:</span><input class="meta-input" type="text" id="b_addr1"></div>
+    <div class="meta-row"><span class="meta-label">City/State/Zip:</span><input class="meta-input" type="text" id="b_addr2"></div>
     <div class="meta-row"><span class="meta-label">Contact:</span><input class="meta-input" type="text" id="b_contact"></div>
     <div class="meta-row"><span class="meta-label">Job Number:</span><input class="meta-input" type="text" id="b_jobnum"></div>
     <div class="meta-row"><span class="meta-label">Project Name:</span><input class="meta-input" type="text" id="b_proj"></div>
@@ -644,6 +648,8 @@ function generateQuote() {
   function gField(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; }
   var qdate     = gField(p + '_qdate');
   var cust      = gField(p + '_cust');
+  var addr1     = gField(p + '_addr1');
+  var addr2     = gField(p + '_addr2');
   var contact   = gField(p + '_contact');
   var jobnum    = gField(p + '_jobnum');
   var proj      = gField(p + '_proj');
@@ -790,7 +796,9 @@ function generateQuote() {
   ch.push(blank());
 
   // Customer block
-  if (cust) ch.push(para([run(cust)]));
+  if (cust)  ch.push(para([run(cust)]));
+  if (addr1) ch.push(para([run(addr1)]));
+  if (addr2) ch.push(para([run(addr2)]));
   ch.push(blank());
 
   // Attention
