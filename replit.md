@@ -109,10 +109,14 @@ The "Generate Word Quote" button builds a `.docx` from the active worksheet
 using the `docx@8` UMD library loaded from CDN. The generated document uses
 real Word page-level decorations:
 
-- **Page header** (repeats on every page): MarTech letterhead with company
-  name, city, phone, and email.
-- **Page footer** (repeats on every page): Ron Stephens signature block
-  (name, title, email, main + cell phone).
+- **Page header** (repeats on every page): MarTech logo image, embedded from
+  `assets/martech-logo.png` via `fetch()` + `D.ImageRun`.
+- **Page footer** (repeats on every page): two-column company info layout
+  with the street address + tel/fax line, the email + website line, and a
+  centered "Contactor License: 684442" line, separated from the body by a
+  thin top divider rule.
+- **Body closing**: "Thank you for the opportunity…" plus the Ron Stephens
+  signature block (name, title, email, main + cell phone).
 
 Scope of Services items are renumbered sequentially (`1.0`, `2.0`, `3.0`, …)
 in the order they appear on the worksheet, regardless of which worksheet

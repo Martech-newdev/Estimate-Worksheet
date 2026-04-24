@@ -3351,67 +3351,131 @@ function generateQuote() {
   ch.push(blank());
   ch.push(blank());
 
-  // Closing — signature block is rendered in the page footer below
+  // Closing — "Thank you" plus the Ron Stephens signature block in the body.
   ch.push(para([run('Thank you for the opportunity to quote you on this project.')]));
+  ch.push(blank());
+  ch.push(blank());
+  ch.push(para([run('Ron Stephens', { bold: true })], { spaceAfter: 60 }));
+  ch.push(para([run('General Manager')], { spaceAfter: 60 }));
+  ch.push(para([run('Rons@mar-tech.com')], { spaceAfter: 60 }));
+  ch.push(para([run('(209) 333-8478 Main')], { spaceAfter: 60 }));
+  ch.push(para([run('(209) 445-4207 Cell')], { spaceAfter: 60 }));
 
-  // ── Page header (repeats on every page): MarTech letterhead ──
-  function headerLine(text, opts) {
+  // Helper for plain footer/header text lines
+  function infoLine(text, opts) {
     opts = opts || {};
     return new D.Paragraph({
-      alignment: AT.LEFT,
+      alignment: opts.align || AT.LEFT,
       spacing: { after: opts.spaceAfter !== undefined ? opts.spaceAfter : 40 },
       children: [new D.TextRun({
         text: text,
         bold: opts.bold || false,
-        size: opts.size || 22,
+        italics: opts.italics || false,
+        size: opts.size || 18,
         font: 'Calibri',
         color: opts.color || '444444'
       })]
     });
   }
-  var pageHeader = new D.Header({
-    children: [
-      headerLine('MarTech - Mechanical Analysis and Repair', { bold: true, size: 26, color: '1a1a1a' }),
-      headerLine('Lodi, CA \u00a0\u00a0(209) 333-8478\u00a0|\u00a0Rons@mar-tech.com', { size: 20, spaceAfter: 120 })
-    ]
-  });
 
-  // ── Page footer (repeats on every page): Ron Stephens signature block ──
-  var pageFooter = new D.Footer({
-    children: [
-      headerLine('Ron Stephens', { bold: true, size: 22, color: '1a1a1a', spaceAfter: 20 }),
-      headerLine('General Manager', { size: 20, spaceAfter: 20 }),
-      headerLine('Rons@mar-tech.com', { size: 20, spaceAfter: 20 }),
-      headerLine('(209) 333-8478 Main', { size: 20, spaceAfter: 20 }),
-      headerLine('(209) 445-4207 Cell', { size: 20, spaceAfter: 0 })
-    ]
-  });
+  // Two-column borderless cell builder for footer layout
+  function footCell(text, align, opts) {
+    opts = opts || {};
+    return new D.TableCell({
+      borders: noBorders,
+      width: { size: 50, type: WU.PERCENTAGE },
+      children: [new D.Paragraph({
+        alignment: align,
+        spacing: { after: 40 },
+        children: [new D.TextRun({
+          text: text,
+          bold: opts.bold || false,
+          italics: opts.italics || false,
+          size: opts.size || 18,
+          font: 'Calibri',
+          color: opts.color || '444444'
+        })]
+      })]
+    });
+  }
 
-  var doc = new D.Document({
-    sections: [{
-      properties: {
-        page: { margin: { top: 1800, right: 1080, bottom: 2160, left: 1080 } }
-      },
-      headers: { default: pageHeader },
-      footers: { default: pageFooter },
-      children: ch
-    }]
-  });
+  // Fetch the MarTech logo, embed it in the header, build the doc.
+  fetch('assets/martech-logo.png')
+    .then(function(r) {
+      if (!r.ok) throw new Error('Could not load logo (HTTP ' + r.status + ')');
+      return r.arrayBuffer();
+    })
+    .then(function(logoBuf) {
+      // ── Page header (repeats on every page): MarTech logo image ──
+      var pageHeader = new D.Header({
+        children: [
+          new D.Paragraph({
+            alignment: AT.LEFT,
+            spacing: { after: 80 },
+            children: [new D.ImageRun({
+              data: logoBuf,
+              transformation: { width: 70, height: 142 }
+            })]
+          })
+        ]
+      });
 
-  D.Packer.toBlob(doc).then(function(blob) {
-    var custClean = cust.replace(/[^a-zA-Z0-9]/g, '').slice(0, 30) || 'Customer';
-    var numClean  = jobnum.replace(/[^a-zA-Z0-9]/g, '') || 'Quote';
-    var filename  = 'Quote_' + numClean + '_' + custClean + '.docx';
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url; a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function() { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
-  }).catch(function(err) {
-    console.error('Quote generation error:', err);
-    alert('Error generating Word document: ' + (err.message || err));
-  });
+      // ── Page footer (repeats on every page): company info layout ──
+      var footerLineTable = new D.Table({
+        width: { size: 100, type: WU.PERCENTAGE },
+        borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder, insideH: noBorder, insideV: noBorder },
+        rows: [
+          new D.TableRow({ children: [
+            footCell('142 North Cluff Avenue, Lodi, California 95240', AT.LEFT),
+            footCell('Tel: 209.333.8478;  Fax: 209.333.8479', AT.RIGHT)
+          ]}),
+          new D.TableRow({ children: [
+            footCell('email: martech@mar-tech.com', AT.LEFT),
+            footCell('website: www.mar-tech.com', AT.RIGHT)
+          ]})
+        ]
+      });
+      var pageFooter = new D.Footer({
+        children: [
+          // Top divider rule above the company info
+          new D.Paragraph({
+            spacing: { after: 60 },
+            border: { top: { style: BS.SINGLE, size: 6, color: '888888' } },
+            children: [new D.TextRun('')]
+          }),
+          footerLineTable,
+          infoLine('Contactor License: 684442', { align: AT.CENTER, italics: true, spaceAfter: 0 })
+        ]
+      });
+
+      var doc = new D.Document({
+        sections: [{
+          properties: {
+            page: { margin: { top: 2160, right: 1080, bottom: 2160, left: 1080 } }
+          },
+          headers: { default: pageHeader },
+          footers: { default: pageFooter },
+          children: ch
+        }]
+      });
+
+      return D.Packer.toBlob(doc);
+    })
+    .then(function(blob) {
+      var custClean = cust.replace(/[^a-zA-Z0-9]/g, '').slice(0, 30) || 'Customer';
+      var numClean  = jobnum.replace(/[^a-zA-Z0-9]/g, '') || 'Quote';
+      var filename  = 'Quote_' + numClean + '_' + custClean + '.docx';
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function() { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
+    })
+    .catch(function(err) {
+      console.error('Quote generation error:', err);
+      alert('Error generating Word document: ' + (err.message || err));
+    });
 }
 </script>
 </body>
