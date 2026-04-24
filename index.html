@@ -3390,15 +3390,33 @@ function generateQuote() {
   // Assemble document children
   var ch = [];
 
-  // ── Company letterhead (lives in the body so it sits below/left of the
-  //     header logo on page 1; matches the original docx template) ──
-  ch.push(para([
-    run('MarTech', { bold: true, size: 32, color: '1a1a1a' }),
-    run(' - Mechanical Analysis and Repair', { size: 24, color: '1a1a1a' })
-  ], { spaceAfter: 60 }));
-  ch.push(para([
-    run('Lodi, CA \u00a0(209) 333-8478\u00a0|\u00a0www.mar-tech.com', { size: 20, color: '444444' })
-  ], { spaceAfter: 200 }));
+  // ── Company letterhead (body, matches reference template exactly) ──
+  // Para 1: "MarTech" bold 18pt + " - Mechanical Analysis and Repair" 11pt regular
+  ch.push(new D.Paragraph({
+    spacing: { after: 40 },
+    children: [
+      new D.TextRun({ text: 'MarTech', bold: true, size: 36, font: 'Calibri', color: '1A1A1A' }),
+      new D.TextRun({ text: ' - ', font: 'Calibri' }),
+      new D.TextRun({ text: 'Mechanical Analysis and Repair', size: 22, font: 'Calibri', color: '444444' })
+    ]
+  }));
+  // Para 2: "Lodi, CA (209) 333-8478 |" + hyperlink "www.mar-tech.com"
+  var bodyWebHyperlink = new D.ExternalHyperlink({
+    link: 'http://www.mar-tech.com',
+    children: [new D.TextRun({
+      text: 'www.mar-tech.com',
+      font: 'Century Gothic', size: 16, color: '0000FF',
+      underline: { type: 'single', color: '0000FF' }
+    })]
+  });
+  ch.push(new D.Paragraph({
+    spacing: { after: 40 },
+    children: [
+      new D.TextRun({ text: 'Lodi, CA ', size: 22, font: 'Calibri', color: '444444' }),
+      new D.TextRun({ text: '(209) 333-8478 |', size: 22, font: 'Calibri', color: '444444' }),
+      bodyWebHyperlink
+    ]
+  }));
   ch.push(blank());
 
   // Date + quote number + prepared-by (matches template body opening)
@@ -3444,7 +3462,7 @@ function generateQuote() {
   ch.push(blank());
 
   if (rangeText) {
-    ch.push(para([run('Estimated Cost of Services')], { spaceAfter: 80 }));
+    ch.push(para([run('FULL SCOPE of Services')], { spaceAfter: 80 }));
     ch.push(para([run('The Services inclusive of ' + rangeText + ' can be performed for:')], { spaceAfter: 160 }));
   }
 
@@ -3470,54 +3488,6 @@ function generateQuote() {
   ch.push(para([run('(209) 333-8478 Main')], { spaceAfter: 60 }));
   ch.push(para([run('(209) 445-4207 Cell')], { spaceAfter: 60 }));
 
-  // Helper for plain footer/header text lines
-  function infoLine(text, opts) {
-    opts = opts || {};
-    return new D.Paragraph({
-      alignment: opts.align || AT.LEFT,
-      spacing: { after: opts.spaceAfter !== undefined ? opts.spaceAfter : 40 },
-      children: [new D.TextRun({
-        text: text,
-        bold: opts.bold || false,
-        italics: opts.italics || false,
-        size: opts.size || 18,
-        font: 'Calibri',
-        color: opts.color || '444444'
-      })]
-    });
-  }
-
-  // Borderless cell builder taking pre-built paragraphs
-  function cellOf(paragraphs, widthPct, align) {
-    return new D.TableCell({
-      borders: noBorders,
-      width: { size: widthPct, type: WU.PERCENTAGE },
-      verticalAlign: align || D.VerticalAlign.TOP,
-      children: paragraphs
-    });
-  }
-
-  // Footer text run (slightly tracked, light gray)
-  function footRun(text, opts) {
-    opts = opts || {};
-    return new D.TextRun({
-      text: text,
-      bold: opts.bold || false,
-      italics: opts.italics || false,
-      size: opts.size || 18,
-      font: 'Calibri',
-      color: opts.color || '555555',
-      characterSpacing: opts.characterSpacing !== undefined ? opts.characterSpacing : 10
-    });
-  }
-  function footPara(children, align) {
-    return new D.Paragraph({
-      alignment: align,
-      spacing: { after: 60 },
-      children: children
-    });
-  }
-
   // Fetch the MarTech logo, embed it in the header, build the doc.
   fetch('assets/martech-logo.png')
     .then(function(r) {
@@ -3525,74 +3495,106 @@ function generateQuote() {
       return r.arrayBuffer();
     })
     .then(function(logoBuf) {
-      // ── Page header (FIRST PAGE ONLY): just the MarTech logo, right-aligned, 1.25" wide ──
-      // Logo source is 184x373; preserve aspect: 1.25" → 120 px wide × 243 px tall at 96 DPI.
+      // ── Page header: floating MarTech logo, 0.62" wide × 1.25" tall, right side ──
+      // Matches the reference template: image is anchored (floating), positioned at
+      // the right edge of the column with a slight upward offset.
       var pageHeader = new D.Header({
         children: [new D.Paragraph({
           alignment: AT.RIGHT,
           spacing: { after: 0 },
           children: [new D.ImageRun({
             data: logoBuf,
-            transformation: { width: 120, height: 243 }
+            transformation: { width: 60, height: 120 },
+            floating: {
+              horizontalPosition: {
+                relative: D.HorizontalPositionRelativeFrom.MARGIN,
+                align: D.HorizontalPositionAlign.RIGHT
+              },
+              verticalPosition: {
+                relative: D.VerticalPositionRelativeFrom.PARAGRAPH,
+                offset: -259080
+              },
+              wrap: { type: D.TextWrappingType.NONE },
+              behindDocument: false,
+              allowOverlap: true
+            }
           })]
         })]
       });
-      // "Blank" header for pages 2+ — needs a real text run so the run isn't empty.
-      var emptyHeader = new D.Header({
-        children: [new D.Paragraph({
-          spacing: { after: 0, line: 20 },
-          children: [new D.TextRun({ text: ' ', size: 2 })]
-        })]
-      });
 
-      // ── Hyperlinks for footer (blue, underlined) ──
-      var emailHyperlinkUL = new D.ExternalHyperlink({
+      // ── Footer styling (Century Gothic, matches reference template) ──
+      var FG = 'Century Gothic';
+      var FOOT_SZ = 16;            // 8pt
+      var FOOT_TRACKING = 34;      // 1.7pt char spacing on the bold address row
+      function fgRun(text, opts) {
+        opts = opts || {};
+        var props = {
+          text: text, font: FG, size: opts.size !== undefined ? opts.size : FOOT_SZ,
+          bold: opts.bold || false, color: opts.color || '000000'
+        };
+        if (opts.characterSpacing !== undefined) props.characterSpacing = opts.characterSpacing;
+        if (opts.underline) props.underline = opts.underline;
+        return new D.TextRun(props);
+      }
+      function fgTab() { return new D.TextRun({ children: [new D.Tab()], font: FG, size: FOOT_SZ }); }
+
+      // Hyperlinks (blue, underlined) — exact reference style
+      var footEmailLink = new D.ExternalHyperlink({
         link: 'mailto:martech@mar-tech.com',
-        children: [new D.TextRun({
-          text: 'martech@mar-tech.com',
-          size: 18, font: 'Calibri', color: '0563C1',
-          underline: { type: 'single', color: '0563C1' },
-          characterSpacing: 10
+        children: [fgRun('martech@mar-tech.com', {
+          color: '0000FF', underline: { type: 'single', color: '0000FF' }
         })]
       });
-      var webHyperlinkUL = new D.ExternalHyperlink({
+      var footWebLink = new D.ExternalHyperlink({
         link: 'http://www.mar-tech.com',
-        children: [new D.TextRun({
-          text: 'www.mar-tech.com',
-          size: 18, font: 'Calibri', color: '0563C1',
-          underline: { type: 'single', color: '0563C1' },
-          characterSpacing: 10
+        children: [fgRun('www.mar-tech.com', {
+          color: '0000FF', underline: { type: 'single', color: '0000FF' }
         })]
       });
 
-      // ── Page footer (repeats on every page): company info layout ──
-      var footerLineTable = new D.Table({
-        width: { size: 100, type: WU.PERCENTAGE },
-        borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder, insideH: noBorder, insideV: noBorder },
-        rows: [
-          new D.TableRow({ children: [
-            cellOf([footPara([footRun('142 North Cluff Avenue, Lodi, California 95240')], AT.LEFT)], 50),
-            cellOf([footPara([footRun('Tel: 209.333.8478;  Fax: 209.333.8479')], AT.RIGHT)], 50)
-          ]}),
-          new D.TableRow({ children: [
-            cellOf([footPara([footRun('email: '), emailHyperlinkUL], AT.LEFT)], 50),
-            cellOf([footPara([footRun('website: '), webHyperlinkUL], AT.RIGHT)], 50)
-          ]})
-        ]
-      });
+      var addrTabs = [
+        { type: D.TabStopType.LEFT, position: 900 },
+        { type: D.TabStopType.LEFT, position: 3330 },
+        { type: D.TabStopType.LEFT, position: 5670 }
+      ];
+      var emailTabs = [
+        { type: D.TabStopType.LEFT, position: 900 },
+        { type: D.TabStopType.LEFT, position: 5490 },
+        { type: D.TabStopType.LEFT, position: 6660 }
+      ];
+
       var pageFooter = new D.Footer({
         children: [
-          // Top divider rule above the company info
+          // Para 1 — empty spacer (matches reference)
+          new D.Paragraph({ tabStops: addrTabs, children: [fgRun('', { bold: true, characterSpacing: FOOT_TRACKING })] }),
+          // Para 2 — bold tracked address line + tab + tel/fax
           new D.Paragraph({
-            spacing: { after: 60 },
-            border: { top: { style: BS.SINGLE, size: 6, color: '888888' } },
-            children: [new D.TextRun('')]
+            tabStops: addrTabs,
+            children: [
+              fgRun('142 North Cluff Avenue, Lodi, California 95240', { bold: true, characterSpacing: FOOT_TRACKING }),
+              fgTab(),
+              fgRun('Tel: 209.333.8478; Fax: 209.333.8479', { bold: true, characterSpacing: FOOT_TRACKING })
+            ]
           }),
-          footerLineTable,
+          // Para 3 — small spacer
+          new D.Paragraph({ children: [fgRun('', { size: 10 })] }),
+          // Para 4 — email + tabs + website (regular weight, hyperlinks)
+          new D.Paragraph({
+            tabStops: emailTabs,
+            children: [
+              fgRun('email: '),
+              footEmailLink,
+              fgTab(),
+              fgTab(),
+              fgTab(),
+              fgRun('website: '),
+              footWebLink
+            ]
+          }),
+          // Para 5 — centered Contactor License line
           new D.Paragraph({
             alignment: AT.CENTER,
-            spacing: { after: 0 },
-            children: [footRun('Contactor License: 684442', { italics: true })]
+            children: [fgRun('Contactor License: 684442')]
           })
         ]
       });
@@ -3600,11 +3602,10 @@ function generateQuote() {
       var doc = new D.Document({
         sections: [{
           properties: {
-            page: { margin: { top: 1440, right: 1080, bottom: 1440, left: 1080, header: 720, footer: 0 } },
-            titlePage: true   // enables a different (full) header on page 1 vs pages 2+
+            page: { margin: { top: 1080, right: 1080, bottom: 1080, left: 1080, header: 720, footer: 0 } }
           },
-          headers: { default: emptyHeader, first: pageHeader },
-          footers: { default: pageFooter, first: pageFooter },
+          headers: { default: pageHeader },
+          footers: { default: pageFooter },
           children: ch
         }]
       });
