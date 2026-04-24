@@ -625,6 +625,7 @@ function clearForm() {
 // ── Auto-save / restore worksheet data via localStorage ──
 var STORAGE_KEY = 'martech_worksheet_v1';
 var _saveTimer = null;
+var _pendingSave = false;
 var _lastSavedAt = null;
 var _statusFlashTimer = null;
 var _storageAvailable = (function() {
@@ -700,6 +701,7 @@ function saveForm() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(collectFormData()));
     _lastSavedAt = Date.now();
+    _pendingSave = false;
     updateSaveStatus(true);
   } catch (e) {
     _storageAvailable = false;
@@ -766,8 +768,21 @@ function importFromFile(ev) {
 
 function scheduleSave() {
   if (_saveTimer) clearTimeout(_saveTimer);
-  _saveTimer = setTimeout(function() { saveForm(); refreshDirtyIndicator(); }, 250);
+  _pendingSave = _storageAvailable;
+  _saveTimer = setTimeout(function() {
+    _saveTimer = null;
+    saveForm();
+    refreshDirtyIndicator();
+  }, 250);
 }
+
+window.addEventListener('beforeunload', function(e) {
+  if (!_storageAvailable) return;
+  if (!_pendingSave) return;
+  e.preventDefault();
+  e.returnValue = '';
+  return '';
+});
 
 function restoreForm() {
   try {
