@@ -1171,9 +1171,21 @@ function generateQuote() {
   if (addr2) ch.push(para([run(addr2)]));
   ch.push(blank());
 
-  // Attention
-  var attentionText = contact ? (contactEmail ? contact + ' <' + contactEmail + '>' : contact) : '___________';
-  ch.push(para([run('Attention:\u00a0\u00a0' + attentionText)]));
+  // Attention — render email as a clickable mailto hyperlink when provided
+  if (contact && contactEmail) {
+    var emailLink = new D.ExternalHyperlink({
+      link: 'mailto:' + contactEmail,
+      children: [run(contactEmail, { color: '0563C1', underline: {} })]
+    });
+    ch.push(para([
+      run('Attention:\u00a0\u00a0' + contact + ' <'),
+      emailLink,
+      run('>')
+    ]));
+  } else {
+    var attentionText = contact ? contact : '___________';
+    ch.push(para([run('Attention:\u00a0\u00a0' + attentionText)]));
+  }
   ch.push(blank());
 
   // Subject
