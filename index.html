@@ -369,6 +369,54 @@
     gap: 8px; flex-wrap: wrap;
   }
   .cust-restore .btn { padding: 3px 9px; font-size: 11px; min-height: 0; }
+  .cust-count-toggle {
+    background: none; border: none; padding: 0; margin: 0;
+    cursor: pointer; color: #777;
+    font: inherit; text-transform: inherit; letter-spacing: inherit;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .cust-count-toggle:hover { color: #1a5276; }
+  .cust-count-toggle:focus { outline: 1px dotted #1a5276; outline-offset: 2px; }
+  .cust-count-caret {
+    display: inline-block;
+    font-size: 9px;
+    transform: translateY(-1px);
+  }
+  .cust-jobs {
+    margin-top: 6px;
+    background: #fff;
+    border: 1px solid #d8d8d8; border-radius: 3px;
+    overflow: hidden;
+  }
+  .cust-job {
+    display: block; width: 100%;
+    padding: 6px 10px;
+    background: #fff; border: none; border-bottom: 1px solid #eee;
+    text-align: left; cursor: pointer;
+    font-family: 'Barlow', sans-serif; font-size: 12px; color: #333;
+    line-height: 1.35;
+  }
+  .cust-job:last-child { border-bottom: none; }
+  .cust-job:hover { background: #eef5fa; color: #1a5276; }
+  .cust-job:focus { outline: 1px dotted #1a5276; outline-offset: -2px; }
+  .cust-job-current { background: #f4f8fb; font-style: italic; }
+  .cust-job-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+  .cust-job-jobnum {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700; font-size: 12px; color: #1a5276;
+    letter-spacing: 0.3px;
+  }
+  .cust-job-name { font-weight: 600; color: #222; word-break: break-word; }
+  .cust-job-proj { color: #555; word-break: break-word; }
+  .cust-job-blank { color: #999; font-style: italic; }
+  .cust-job-meta {
+    display: block; font-size: 11px; color: #888; margin-top: 2px;
+  }
+  .cust-job-current-tag {
+    font-size: 10px; color: #1a5276; font-style: normal;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    font-family: 'Barlow Condensed', sans-serif; font-weight: 700;
+  }
 
   @media print {
     body { background:#fff; padding:0; }
@@ -1628,6 +1676,7 @@ function _escHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&l
 // ── Customer management dialog ──
 var _editingCustomerKey = null;
 var _customerActionMode = null; // 'edit' | 'merge' | 'delete'
+var _expandedCustomerKeys = {}; // customer key -> true when its job list is expanded
 
 function _collectCustomersForManagement() {
   var lib = _readLibrary();
@@ -1678,14 +1727,34 @@ function _collectCustomersForManagement() {
           if (!prev.contact_email && cand.contact_email) prev.contact_email = cand.contact_email;
         }
       }
-      if (!prev.worksheets[names[i]]) prev.worksheets[names[i]] = true;
+      if (!prev.worksheets[names[i]]) {
+        prev.worksheets[names[i]] = {
+          name: names[i],
+          jobnum: (entry.data[pre + '_jobnum'] || '').trim(),
+          project: (entry.data[pre + '_proj'] || '').trim(),
+          savedAt: ms
+        };
+      } else {
+        // Same worksheet, other prefix — fill any missing job/project info.
+        var existingWs = prev.worksheets[names[i]];
+        if (!existingWs.jobnum)  existingWs.jobnum  = (entry.data[pre + '_jobnum'] || '').trim();
+        if (!existingWs.project) existingWs.project = (entry.data[pre + '_proj']   || '').trim();
+      }
     }
   }
   var list = [];
   for (var k in byKey) {
     if (!Object.prototype.hasOwnProperty.call(byKey, k)) continue;
     var c = byKey[k];
-    c.worksheetCount = Object.keys(c.worksheets).length;
+    var wsNames = Object.keys(c.worksheets);
+    c.worksheetCount = wsNames.length;
+    var wsList = [];
+    for (var w = 0; w < wsNames.length; w++) wsList.push(c.worksheets[wsNames[w]]);
+    wsList.sort(function(a, b) {
+      if (b.savedAt !== a.savedAt) return b.savedAt - a.savedAt;
+      return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+    });
+    c.worksheetList = wsList;
     list.push(c);
   }
   list.sort(function(a, b) {
@@ -1833,6 +1902,7 @@ function openCustomersDialog() {
   }
   _editingCustomerKey = null;
   _customerActionMode = null;
+  _expandedCustomerKeys = {};
   renderCustomersList();
   _wireCustomersListHandler();
   var modal = document.getElementById('customersModal');
@@ -1869,7 +1939,18 @@ function renderCustomersList() {
     var contactLine = (c.contact || c.contact_email)
       ? _escHtml([c.contact, c.contact_email].filter(Boolean).join(' \u2022 '))
       : '<span class="cust-blank">no contact on file</span>';
-    var countLine = 'Used in ' + c.worksheetCount + ' saved worksheet' + (c.worksheetCount === 1 ? '' : 's');
+    var countText = 'Used in ' + c.worksheetCount + ' saved worksheet' + (c.worksheetCount === 1 ? '' : 's');
+    var expanded = !!_expandedCustomerKeys[c.key];
+    var keyAttrCount = _escAttr(c.key);
+    var caret = expanded ? '\u25BE' : '\u25B8';
+    var countLine =
+      '<button type="button" class="cust-count-toggle" data-cust-action="toggle-jobs" data-cust-key="' + keyAttrCount + '" ' +
+      'aria-expanded="' + (expanded ? 'true' : 'false') + '" aria-controls="cust_jobs_' + keyAttrCount + '" ' +
+      'title="' + (expanded ? 'Hide saved worksheets' : 'Show saved worksheets') + '">' +
+        '<span class="cust-count-caret" aria-hidden="true">' + caret + '</span>' +
+        _escHtml(countText) +
+      '</button>';
+    var jobsMarkup = expanded ? _renderCustomerJobsList(c) : '';
     var actionsMarkup = '';
     if (!isEditing) {
       var keyAttr = _escAttr(c.key);
@@ -1896,6 +1977,7 @@ function renderCustomersList() {
       '<div class="cust-meta">' + addrLine + '</div>' +
       '<div class="cust-meta">' + contactLine + '</div>' +
       '<div class="cust-count">' + countLine + '</div>' +
+      jobsMarkup +
       formMarkup +
     '</div>';
   }
@@ -1911,6 +1993,48 @@ function renderCustomersList() {
       if (el) el.focus();
     }, 0);
   }
+}
+
+function _renderCustomerJobsList(c) {
+  var ws = c.worksheetList || [];
+  if (!ws.length) {
+    return '<div class="cust-jobs" id="cust_jobs_' + _escAttr(c.key) + '">' +
+      '<div style="padding:8px 10px;font-size:12px;color:#777;font-style:italic;">No saved worksheets reference this customer.</div>' +
+    '</div>';
+  }
+  var html = '<div class="cust-jobs" id="cust_jobs_' + _escAttr(c.key) + '">';
+  for (var i = 0; i < ws.length; i++) {
+    var w = ws[i];
+    var nameAttr = _escAttr(w.name);
+    var isCurrent = (w.name === _currentWorksheetName);
+    var rowCls = 'cust-job' + (isCurrent ? ' cust-job-current' : '');
+    var jobnumPart = w.jobnum
+      ? '<span class="cust-job-jobnum">' + _escHtml(w.jobnum) + '</span>'
+      : '';
+    var projPart = w.project
+      ? '<span class="cust-job-proj">' + _escHtml(w.project) + '</span>'
+      : '<span class="cust-job-blank">no project name</span>';
+    var namePart = '<span class="cust-job-name">' + _escHtml(w.name) + '</span>';
+    var currentTag = isCurrent
+      ? ' <span class="cust-job-current-tag">currently loaded</span>'
+      : '';
+    var savedRel = w.savedAt ? _formatRelativeTime(w.savedAt) : '';
+    var savedAbs = w.savedAt ? _formatSavedAtAbsolute(w.savedAt) : '';
+    var metaText = savedAbs
+      ? 'Saved ' + (savedRel ? savedRel + ' \u2022 ' : '') + savedAbs
+      : (savedRel ? 'Saved ' + savedRel : 'Save date unknown');
+    var titleAttr = savedAbs
+      ? ' title="' + _escAttr((isCurrent ? 'Already loaded — click to close. ' : 'Load this worksheet. ') + 'Last saved: ' + savedAbs) + '"'
+      : ' title="' + (isCurrent ? 'Already loaded — click to close.' : 'Load this worksheet.') + '"';
+    html +=
+      '<button type="button" class="' + rowCls + '" data-cust-action="load-job" data-ws-name="' + nameAttr + '"' + titleAttr + '>' +
+        '<span class="cust-job-line">' + jobnumPart + namePart + currentTag + '</span>' +
+        '<span class="cust-job-line">' + projPart + '</span>' +
+        '<span class="cust-job-meta">' + _escHtml(metaText) + '</span>' +
+      '</button>';
+  }
+  html += '</div>';
+  return html;
 }
 
 function _renderCustomerEditForm(c) {
@@ -1977,18 +2101,45 @@ function _wireCustomersListHandler() {
     if (!btn || btn === container) return;
     var action = btn.getAttribute('data-cust-action');
     var key    = btn.getAttribute('data-cust-key') || '';
+    var wsName = btn.getAttribute('data-ws-name') || '';
     switch (action) {
-      case 'edit':           startCustomerEdit(key);     break;
-      case 'merge':          startCustomerMerge(key);    break;
-      case 'delete':         startCustomerDelete(key);   break;
-      case 'restore':        restoreCustomer(key);       break;
-      case 'cancel':         cancelCustomerAction();     break;
-      case 'save-edit':      saveCustomerEdit(key);      break;
-      case 'save-merge':     saveCustomerMerge(key);     break;
-      case 'confirm-delete': confirmCustomerDelete(key); break;
+      case 'edit':           startCustomerEdit(key);          break;
+      case 'merge':          startCustomerMerge(key);         break;
+      case 'delete':         startCustomerDelete(key);        break;
+      case 'restore':        restoreCustomer(key);            break;
+      case 'cancel':         cancelCustomerAction();          break;
+      case 'save-edit':      saveCustomerEdit(key);           break;
+      case 'save-merge':     saveCustomerMerge(key);          break;
+      case 'confirm-delete': confirmCustomerDelete(key);      break;
+      case 'toggle-jobs':    toggleCustomerJobs(key);         break;
+      case 'load-job':       loadWorksheetFromCustomers(wsName); break;
     }
   });
   _customersListHandlerWired = true;
+}
+
+function toggleCustomerJobs(key) {
+  if (!key) return;
+  if (_expandedCustomerKeys[key]) delete _expandedCustomerKeys[key];
+  else _expandedCustomerKeys[key] = true;
+  renderCustomersList();
+}
+
+function loadWorksheetFromCustomers(name) {
+  if (!name) return;
+  var lib = _readLibrary();
+  if (!lib.items[name]) {
+    alert('That worksheet no longer exists.');
+    renderCustomersList();
+    return;
+  }
+  if (name === _currentWorksheetName) {
+    closeCustomersDialog();
+    return;
+  }
+  loadWorksheetByName(name);
+  // If the load succeeded (or the user accepted any dirty-prompt), close the dialog.
+  if (_currentWorksheetName === name) closeCustomersDialog();
 }
 
 function startCustomerEdit(key)   { _editingCustomerKey = key; _customerActionMode = 'edit';   renderCustomersList(); }

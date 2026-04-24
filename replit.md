@@ -21,11 +21,17 @@ Single-page tool for creating professional job estimates with:
   worksheets independently.
 - A "Customers..." dialog (next to "Defaults..." on both tabs) for managing
   the suggestion list directly: each customer row shows its current name,
-  address, contact, and how many saved worksheets reference it. Each row
-  supports Edit (rename + update the four contact fields across every
-  matching saved worksheet, with merge confirmation when renaming into an
-  existing customer), Merge (renames the customer to a chosen target across
-  every matching saved worksheet, leaving each worksheet's address/contact
+  address, contact, and how many saved worksheets reference it. The
+  "Used in N saved worksheets" line is itself an expand toggle — clicking
+  it reveals a list of those worksheets (job number, worksheet name,
+  project name, relative save date, with the currently-loaded one tagged).
+  Clicking a worksheet entry loads it (same dirty-prompt as the picker)
+  and closes the dialog; the list is also shown for hidden customers so
+  old worksheets can be cleaned up before un-hiding. Each row supports
+  Edit (rename + update the four contact fields across every matching
+  saved worksheet, with merge confirmation when renaming into an existing
+  customer), Merge (renames the customer to a chosen target across every
+  matching saved worksheet, leaving each worksheet's address/contact
   untouched), and Delete (hides the customer from the suggestion dropdown
   via an exclusions list, with an optional checkbox to also wipe the name
   and contact info from every saved worksheet that uses it). Hidden
