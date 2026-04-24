@@ -1310,6 +1310,10 @@ function importFromFile(ev) {
         input.value = '';
         return;
       }
+      if (!_confirmDuplicateJobNumber(_readLibrary(), data, null, 'Import anyway? Click Cancel to skip the import.')) {
+        input.value = '';
+        return;
+      }
       var els = document.querySelectorAll('input[id], textarea[id], select[id]');
       for (var i = 0; i < els.length; i++) {
         var el = els[i];
@@ -2166,17 +2170,18 @@ function _findDuplicateJobNumberNames(lib, jobnum, excludeName) {
   return matches;
 }
 
-function _confirmDuplicateJobNumber(lib, data, excludeName) {
+function _confirmDuplicateJobNumber(lib, data, excludeName, actionPrompt) {
   var jobnum = String((data['a_jobnum'] || data['b_jobnum'] || '')).trim();
   if (!jobnum) return true;
   var dupes = _findDuplicateJobNumberNames(lib, jobnum, excludeName);
   if (!dupes.length) return true;
   var listed = dupes.slice(0, 3).map(function(n) { return '• "' + n + '"'; }).join('\n');
   if (dupes.length > 3) listed += '\n• …and ' + (dupes.length - 3) + ' more';
+  var tail = actionPrompt || 'Save anyway? Click Cancel to edit the job number first.';
   var msg = 'Job number "' + jobnum + '" is already used by '
     + (dupes.length === 1 ? 'another saved worksheet:' : dupes.length + ' other saved worksheets:')
     + '\n\n' + listed
-    + '\n\nSave anyway? Click Cancel to edit the job number first.';
+    + '\n\n' + tail;
   return confirm(msg);
 }
 
