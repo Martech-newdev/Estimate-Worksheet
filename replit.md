@@ -63,6 +63,10 @@ Single-page tool for creating professional job estimates with:
 
 ## Storage
 
+Storage is split into two layers:
+
+**Per-user (browser localStorage)** — survives only on the same browser/profile:
+
 - `localStorage["martech_worksheet_v1"]` — auto-saved snapshot of the
   currently-open (active) worksheet. Restored on page load.
 - `localStorage["martech_worksheets_v1"]` — named worksheet library:
@@ -70,45 +74,35 @@ Single-page tool for creating professional job estimates with:
   explicitly via the picker's Save / Save As / Delete buttons. Switching to a
   saved worksheet asks for confirmation if the active worksheet has unsaved
   changes relative to its baseline.
-- `localStorage["martech_defaults_v1"]` — saved default values for the
-  Estimator, Contact, Contact Email, Address Line 1, City/State/Zip,
-  Default Markup, Customer, and Project Name meta fields, plus a
-  `today_dates` toggle (pre-fills Quote Date / Date In with today's
-  date), a `jobnum_tpl` template for Job Number (supports `{YYYY}`,
-  `{YY}`, `{MM}`, `{DD}` date tokens and `{####}` for an
-  auto-incrementing counter), and a `due_offset_days` integer that
-  pre-fills Due Date as today + N days. Edited via the "Defaults..."
-  button. Pre-fill on first load (when no auto-saved data exists) and
-  after Clear Form on the active tab. Per-worksheet edits to those
-  fields do not change the saved defaults. The Defaults dialog also
-  shows a live read-only preview of the resolved Job Number under the
-  template field, computed from the current template and the current
-  "Next counter value" (today's date for date tokens). The preview
-  never consumes the persisted counter and hides itself when the
-  template is empty. The Due Date Offset field has a matching live
-  read-only preview underneath it showing the resolved MM/DD/YYYY
-  date (today + N days); it hides when the offset is empty/invalid.
-- `localStorage["martech_defaults_counter_v1"]` — integer counter
-  consumed by the `{####}` token in the Job Number template. Increments
-  each time a worksheet is pre-filled with a templated job number. The
-  next value is shown and editable in the Defaults dialog; cleared to 1
-  by Clear Defaults.
-- `localStorage["martech_imported_customers_v1"]` — JSON array of
-  customers seeded via the Customers dialog's "Import Customers..."
-  action: `[{ name, addr1, addr2, contact, contact_email, importedAt }, ...]`.
-  Read alongside the worksheet-derived customers to populate the
-  Customer suggestion dropdown and the Customers dialog. Names are
-  case-insensitive unique; running the import again with the same name
-  fills only blank fields (existing values are never overwritten).
-  Editing/Merging/Deleting from the Customers dialog keeps this store
-  in sync.
-- `localStorage["martech_customer_exclusions_v1"]` — JSON array of
-  lowercase customer names hidden from the Customer suggestion dropdown
-  via the Customers dialog's Delete action. The Customers dialog still
-  shows hidden entries (with a Restore button) as long as a saved
-  worksheet still references them. Saving a worksheet whose Customer
-  field matches an excluded name removes that name from the exclusion
-  list automatically.
+
+**Shared across all site visitors (Postgres `shared_kv` table, served via
+`/api/store/<key>`)** — every visitor sees the same data:
+
+- `defaults` — saved default values for the Estimator, Contact, Contact
+  Email, Address Line 1, City/State/Zip, Default Markup, Customer, and
+  Project Name meta fields, plus the `today_dates` toggle, the
+  `jobnum_tpl` Job Number template (`{YYYY}`/`{YY}`/`{MM}`/`{DD}`/`{####}`
+  tokens), and the `due_offset_days` integer (pre-fills Due Date as
+  today + N days). Edited via the "Defaults..." button.
+- `defaults_counter` — integer counter consumed by the `{####}` token in
+  the Job Number template. Increments each time a worksheet is
+  pre-filled with a templated job number.
+- `imported_customers` — JSON array of customers seeded via the
+  Customers dialog's "Import Customers..." action:
+  `[{ name, addr1, addr2, contact, contact_email, importedAt }, ...]`.
+- `customer_exclusions` — JSON array of lowercase customer names hidden
+  from the Customer suggestion dropdown.
+
+Reads of these four shared keys come from an in-memory cache populated
+once at page load (`_sharedFetchAll()` issues a single `GET /api/store`
+before `_initApp()` runs). Writes are fire-and-forget `PUT /api/store/<key>`
+calls so the UI stays snappy; the cache is updated synchronously so the
+calling code sees the new value immediately.
+
+The legacy `localStorage["martech_defaults_v1"]`,
+`martech_defaults_counter_v1`, `martech_imported_customers_v1`, and
+`martech_customer_exclusions_v1` keys are no longer read or written by
+the app — any old values left in a user's browser are silently ignored.
 
 ## Word Quote Generation
 
@@ -139,22 +133,47 @@ The Attention line renders as `Name | email`, with the email as a clickable
 - **Frontend:** Pure HTML5, CSS3, vanilla JavaScript (no frameworks or build tools)
 - **Fonts:** Barlow and Barlow Condensed via Google Fonts CDN
 - **Single file:** `index.html` contains all HTML, CSS, and JS
+- **Backend:** Flask (Python) + psycopg2 with a small `SimpleConnectionPool`
+  pointed at the Replit-managed Postgres (`DATABASE_URL`).
 
 ## Running the App
 
-The app is served via Python's built-in HTTP server:
+The app is served by `server.py` (Flask, port 5000):
 
 ```
-python3 -m http.server 5000
+python3 server.py
 ```
+
+The same process serves `index.html`, the `assets/` and
+`attached_assets/` folders, and the JSON API for shared storage. All
+HTML/JS responses are sent with `Cache-Control: no-store` so visitors
+always get the latest deployed version.
+
+## API
+
+- `GET  /api/store` — returns all four shared keys
+  (`defaults`, `defaults_counter`, `imported_customers`,
+  `customer_exclusions`) in one response. Used by `_sharedFetchAll()` at
+  page load.
+- `GET  /api/store/<key>` — returns a single shared key.
+- `PUT  /api/store/<key>` body `{"value": <json>}` — upserts the value.
+
+The backing table is `shared_kv (key TEXT PRIMARY KEY, value JSONB,
+updated_at TIMESTAMPTZ)`.
 
 ## Project Structure
 
 ```
-index.html    # Entire application (HTML + CSS + JS)
-replit.md     # This file
+index.html         # Entire frontend (HTML + CSS + JS)
+server.py          # Flask backend: static files + /api/store
+assets/            # Logo + other static assets
+attached_assets/   # Reference docs, sample CSV, etc.
+replit.md          # This file
 ```
 
 ## Deployment
 
-Configured as a static site deployment with `publicDir: "."`.
+The app now has a backend and a database, so the deployment target must
+be **Reserved VM** or **Autoscale** (NOT Static). When publishing, pick
+an "Autoscale" deployment with run command `python3 server.py` and the
+existing `DATABASE_URL` secret will be inherited automatically.

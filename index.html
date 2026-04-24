@@ -1023,26 +1023,102 @@ function clearForm() {
   if (typeof refreshDirtyIndicator === 'function') refreshDirtyIndicator();
 }
 
+// ── Shared (server-side) key/value store ──
+// These four keys are stored on the server so every site visitor sees the
+// same Defaults, Imported Customers, and Customer Exclusions. Per-user data
+// (worksheet auto-save and the saved-worksheet library) stays in localStorage.
+var SHARED_KEYS = ['defaults', 'defaults_counter', 'imported_customers', 'customer_exclusions'];
+var _sharedCache = { defaults: {}, defaults_counter: 1, imported_customers: [], customer_exclusions: [] };
+var _sharedReady = false;
+
+function _sharedFetchAll() {
+  return fetch('/api/store', { cache: 'no-store' })
+    .then(function(r) {
+      if (!r.ok) throw new Error('store fetch failed: ' + r.status);
+      return r.json();
+    })
+    .then(function(data) {
+      if (data && typeof data === 'object') {
+        for (var i = 0; i < SHARED_KEYS.length; i++) {
+          var k = SHARED_KEYS[i];
+          if (data[k] !== undefined && data[k] !== null) _sharedCache[k] = data[k];
+        }
+      }
+      _sharedReady = true;
+    });
+}
+
+function _sharedGet(key) { return _sharedCache[key]; }
+
+var _sharedWriteFailureNotified = false;
+function _notifySharedWriteFailure(err) {
+  console.error('shared store PUT failed', err);
+  if (_sharedWriteFailureNotified) return;
+  _sharedWriteFailureNotified = true;
+  // One-shot toast so the user knows future visitors won't see this change.
+  try {
+    alert('Could not save shared data to the server. Your change is in this browser only and will be lost on reload. Check your network connection and try again.');
+  } catch (e) {}
+}
+
+function _sharedPut(key, value) {
+  _sharedCache[key] = value;
+  // Apply locally first so the calling code (which expects synchronous writes)
+  // sees the new value immediately, then PUT to the server. We surface PUT
+  // failures via a one-shot alert so silent data loss doesn't go unnoticed.
+  fetch('/api/store/' + encodeURIComponent(key), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value: value })
+  }).then(function(r) {
+    if (!r.ok) _notifySharedWriteFailure(new Error('PUT ' + key + ' -> ' + r.status));
+    else _sharedWriteFailureNotified = false;
+  }, _notifySharedWriteFailure);
+  return true;
+}
+
+// Atomically consume the next counter value from the server. Falls back to
+// the cached value if the network is down (best-effort — the resolver also
+// has a synchronous fallback path via _consumeCounter).
+function _consumeCounterRemote() {
+  return fetch('/api/counter/next', { method: 'POST' })
+    .then(function(r) { if (!r.ok) throw new Error('counter ' + r.status); return r.json(); })
+    .then(function(d) {
+      if (typeof d.next === 'number') _sharedCache.defaults_counter = d.next;
+      return (typeof d.consumed === 'number') ? d.consumed : _readCounter();
+    });
+}
+
 // ── Default field values pre-filled on new / cleared worksheets ──
-var DEFAULTS_KEY = 'martech_defaults_v1';
-var DEFAULTS_COUNTER_KEY = 'martech_defaults_counter_v1';
+var DEFAULTS_KEY = 'martech_defaults_v1';            // legacy local fallback (no longer written)
+var DEFAULTS_COUNTER_KEY = 'martech_defaults_counter_v1';  // legacy local fallback (no longer written)
 var DEFAULT_FIELDS = ['estimator', 'contact', 'contact_email', 'addr1', 'addr2', 'cust', 'proj'];
 var MARKUP_VALUES = ['1.54', '1.43', '1.33', '1.25', '1.18'];
 
 function _readCounter() {
-  if (!_storageAvailable) return 1;
-  try {
-    var v = parseInt(localStorage.getItem(DEFAULTS_COUNTER_KEY), 10);
-    return (isNaN(v) || v < 1) ? 1 : v;
-  } catch (e) { return 1; }
+  var v = _sharedGet('defaults_counter');
+  if (typeof v === 'string') v = parseInt(v, 10);
+  return (typeof v !== 'number' || isNaN(v) || v < 1) ? 1 : v;
 }
 function _writeCounter(n) {
-  if (!_storageAvailable) return;
-  try { localStorage.setItem(DEFAULTS_COUNTER_KEY, String(n)); } catch (e) {}
+  _sharedPut('defaults_counter', n);
 }
+// Consume the next counter value. Returns synchronously (so the caller can
+// stamp the value into a form field immediately), but also fires an atomic
+// server-side increment so concurrent browsers don't claim the same value
+// long term. The atomic response is folded back into the local cache so the
+// next consume sees the authoritative value.
 function _consumeCounter() {
   var n = _readCounter();
-  _writeCounter(n + 1);
+  _sharedCache.defaults_counter = n + 1;
+  fetch('/api/counter/next', { method: 'POST' })
+    .then(function(r) { if (!r.ok) throw new Error('counter ' + r.status); return r.json(); })
+    .then(function(d) {
+      if (typeof d.next === 'number') _sharedCache.defaults_counter = d.next;
+    }, function(e) {
+      // Fall back to a regular PUT so the local guess at least lands on the server.
+      _sharedPut('defaults_counter', n + 1);
+    });
   return n;
 }
 
@@ -1152,19 +1228,12 @@ function _resolveDefaults(d) {
 }
 
 function _readDefaults() {
-  if (!_storageAvailable) return {};
-  try {
-    var raw = localStorage.getItem(DEFAULTS_KEY);
-    if (!raw) return {};
-    var d = JSON.parse(raw);
-    return (d && typeof d === 'object') ? d : {};
-  } catch (e) { return {}; }
+  var d = _sharedGet('defaults');
+  return (d && typeof d === 'object' && !Array.isArray(d)) ? d : {};
 }
 
 function _writeDefaults(d) {
-  if (!_storageAvailable) return false;
-  try { localStorage.setItem(DEFAULTS_KEY, JSON.stringify(d || {})); return true; }
-  catch (e) { alert('Could not save defaults — browser storage is full or unavailable.'); return false; }
+  return _sharedPut('defaults', d || {});
 }
 
 function _todayMDY() {
@@ -1226,10 +1295,8 @@ function applyDefaultsIfBlank() {
 }
 
 function openDefaultsDialog() {
-  if (!_storageAvailable) {
-    alert('Defaults can\'t be saved — browser storage is unavailable.');
-    return;
-  }
+  // Defaults are now stored on the server, not in localStorage, so we no
+  // longer block this dialog when localStorage is unavailable.
   var d = _readDefaults();
   var e = document.getElementById('def_estimator');
   var c = document.getElementById('def_contact');
@@ -1653,55 +1720,43 @@ var CUSTOMER_EXCLUSIONS_KEY = 'martech_customer_exclusions_v1';
 var IMPORTED_CUSTOMERS_KEY = 'martech_imported_customers_v1';
 
 function _readImportedCustomers() {
-  if (!_storageAvailable) return {};
-  try {
-    var raw = localStorage.getItem(IMPORTED_CUSTOMERS_KEY);
-    if (!raw) return {};
-    var arr = JSON.parse(raw);
-    if (!Array.isArray(arr)) return {};
-    var out = {};
-    for (var i = 0; i < arr.length; i++) {
-      var c = arr[i];
-      if (!c || typeof c !== 'object') continue;
-      var nm = (c.name || '').trim();
-      if (!nm) continue;
-      var k = nm.toLowerCase();
-      out[k] = {
-        name: nm,
-        addr1: (c.addr1 || '').trim(),
-        addr2: (c.addr2 || '').trim(),
-        contact: (c.contact || '').trim(),
-        contact_email: (c.contact_email || '').trim(),
-        importedAt: c.importedAt || ''
-      };
-    }
-    return out;
-  } catch (e) { return {}; }
+  var arr = _sharedGet('imported_customers');
+  if (!Array.isArray(arr)) return {};
+  var out = {};
+  for (var i = 0; i < arr.length; i++) {
+    var c = arr[i];
+    if (!c || typeof c !== 'object') continue;
+    var nm = (c.name || '').trim();
+    if (!nm) continue;
+    var k = nm.toLowerCase();
+    out[k] = {
+      name: nm,
+      addr1: (c.addr1 || '').trim(),
+      addr2: (c.addr2 || '').trim(),
+      contact: (c.contact || '').trim(),
+      contact_email: (c.contact_email || '').trim(),
+      importedAt: c.importedAt || ''
+    };
+  }
+  return out;
 }
 
 function _writeImportedCustomers(map) {
-  if (!_storageAvailable) return false;
-  try {
-    var arr = [];
-    for (var k in map) {
-      if (!Object.prototype.hasOwnProperty.call(map, k)) continue;
-      var c = map[k];
-      if (!c || !c.name) continue;
-      arr.push({
-        name: c.name,
-        addr1: c.addr1 || '',
-        addr2: c.addr2 || '',
-        contact: c.contact || '',
-        contact_email: c.contact_email || '',
-        importedAt: c.importedAt || new Date().toISOString()
-      });
-    }
-    localStorage.setItem(IMPORTED_CUSTOMERS_KEY, JSON.stringify(arr));
-    return true;
-  } catch (e) {
-    alert('Could not save imported customers — browser storage is full or unavailable.');
-    return false;
+  var arr = [];
+  for (var k in map) {
+    if (!Object.prototype.hasOwnProperty.call(map, k)) continue;
+    var c = map[k];
+    if (!c || !c.name) continue;
+    arr.push({
+      name: c.name,
+      addr1: c.addr1 || '',
+      addr2: c.addr2 || '',
+      contact: c.contact || '',
+      contact_email: c.contact_email || '',
+      importedAt: c.importedAt || new Date().toISOString()
+    });
   }
+  return _sharedPut('imported_customers', arr);
 }
 
 function _importedAtMs(entry) {
@@ -1711,30 +1766,21 @@ function _importedAtMs(entry) {
 }
 
 function _readCustomerExclusions() {
-  if (!_storageAvailable) return {};
-  try {
-    var raw = localStorage.getItem(CUSTOMER_EXCLUSIONS_KEY);
-    if (!raw) return {};
-    var arr = JSON.parse(raw);
-    if (!Array.isArray(arr)) return {};
-    var out = {};
-    for (var i = 0; i < arr.length; i++) {
-      if (typeof arr[i] === 'string' && arr[i]) out[arr[i].toLowerCase()] = true;
-    }
-    return out;
-  } catch (e) { return {}; }
+  var arr = _sharedGet('customer_exclusions');
+  if (!Array.isArray(arr)) return {};
+  var out = {};
+  for (var i = 0; i < arr.length; i++) {
+    if (typeof arr[i] === 'string' && arr[i]) out[arr[i].toLowerCase()] = true;
+  }
+  return out;
 }
 
 function _writeCustomerExclusions(map) {
-  if (!_storageAvailable) return false;
-  try {
-    var arr = [];
-    for (var k in map) {
-      if (Object.prototype.hasOwnProperty.call(map, k) && map[k]) arr.push(k);
-    }
-    localStorage.setItem(CUSTOMER_EXCLUSIONS_KEY, JSON.stringify(arr));
-    return true;
-  } catch (e) { return false; }
+  var arr = [];
+  for (var k in map) {
+    if (Object.prototype.hasOwnProperty.call(map, k) && map[k]) arr.push(k);
+  }
+  return _sharedPut('customer_exclusions', arr);
 }
 
 function _autoUnexcludeFromData(data) {
@@ -3219,7 +3265,7 @@ document.addEventListener('change', function(e) {
   scheduleSave();
 });
 
-window.onload = function() {
+function _initApp() {
   buildSheet('a', 18);
   buildSheet('b', 63);
   var pages = document.getElementsByClassName('tab-page');
@@ -3242,6 +3288,16 @@ window.onload = function() {
   updateSaveStatus(false);
   refreshDirtyIndicator();
   setInterval(function() { if (!(_currentWorksheetName && isWorksheetDirty())) updateSaveStatus(false); }, 15000);
+}
+
+window.onload = function() {
+  // Fetch shared Defaults / Imported Customers / Exclusions before initializing
+  // the UI, so the very first restoreForm() / applyDefaultsIfBlank() call sees
+  // the server-side data instead of the empty in-memory placeholders.
+  _sharedFetchAll().then(_initApp, function(err) {
+    console.error('Could not load shared store; starting with empty defaults.', err);
+    _initApp();
+  });
 };
 
 function generateQuote() {
