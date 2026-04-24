@@ -23,10 +23,12 @@ Single-page tool for creating professional job estimates with:
   saved worksheet asks for confirmation if the active worksheet has unsaved
   changes relative to its baseline.
 - `localStorage["martech_defaults_v1"]` — saved default values for the
-  Estimator, Contact, and Contact Email meta fields. Edited via the
-  "Defaults..." button. Pre-fill on first load (when no auto-saved data exists)
-  and after Clear Form on the active tab. Per-worksheet edits to those fields
-  do not change the saved defaults.
+  Estimator, Contact, Contact Email, Address Line 1, City/State/Zip, and
+  Default Markup meta fields, plus a `today_dates` toggle that pre-fills
+  Quote Date / Date In with today's date. Edited via the "Defaults..."
+  button. Pre-fill on first load (when no auto-saved data exists) and after
+  Clear Form on the active tab. Per-worksheet edits to those fields do not
+  change the saved defaults.
 
 ## Tech Stack
 

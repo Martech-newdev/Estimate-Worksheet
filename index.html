@@ -287,7 +287,7 @@
   <button class="btn btn-blue" onclick="exportToFile()">&#128190; Save to File</button>
   <button class="btn btn-blue" onclick="document.getElementById('importFile').click()">&#128194; Load from File</button>
   <button class="btn btn-dark" onclick="clearForm()">&#8635; Clear Form</button>
-  <button class="btn btn-blue" onclick="openDefaultsDialog()" title="Set default Estimator and contact info to pre-fill on new worksheets">&#9881;&#65039; Defaults&hellip;</button>
+  <button class="btn btn-blue" onclick="openDefaultsDialog()" title="Set company-wide defaults (estimator, contact, address, markup, dates) to pre-fill on new worksheets">&#9881;&#65039; Defaults&hellip;</button>
   <input type="file" id="importFile" accept=".json,application/json" style="display:none" onchange="importFromFile(event)">
   <span id="saveStatus" class="save-status" aria-live="polite">Not saved yet</span>
 </div>
@@ -488,14 +488,14 @@
   <button class="btn btn-blue" onclick="exportToFile()">&#128190; Save to File</button>
   <button class="btn btn-blue" onclick="document.getElementById('importFile').click()">&#128194; Load from File</button>
   <button class="btn btn-dark" onclick="clearForm()">&#8635; Clear Form</button>
-  <button class="btn btn-blue" onclick="openDefaultsDialog()" title="Set default Estimator and contact info to pre-fill on new worksheets">&#9881;&#65039; Defaults&hellip;</button>
+  <button class="btn btn-blue" onclick="openDefaultsDialog()" title="Set company-wide defaults (estimator, contact, address, markup, dates) to pre-fill on new worksheets">&#9881;&#65039; Defaults&hellip;</button>
 </div>
 
 <div class="modal-overlay" id="defaultsModal" role="dialog" aria-modal="true" aria-labelledby="defaultsModalTitle">
   <div class="modal-card">
-    <div class="modal-head" id="defaultsModalTitle">Default Estimator &amp; Contact</div>
+    <div class="modal-head" id="defaultsModalTitle">Worksheet Defaults</div>
     <div class="modal-body">
-      <div class="hint">These defaults pre-fill on new or cleared worksheets. Editing the fields on a worksheet won't change the saved defaults.</div>
+      <div class="hint">These defaults pre-fill on new or cleared worksheets. Editing the fields on a worksheet won't change the saved defaults. Leave a field blank to skip it.</div>
       <div class="modal-field">
         <label for="def_estimator">Estimator</label>
         <input type="text" id="def_estimator" autocomplete="off">
@@ -507,6 +507,31 @@
       <div class="modal-field">
         <label for="def_contact_email">Contact Email</label>
         <input type="email" id="def_contact_email" autocomplete="off">
+      </div>
+      <div class="modal-field">
+        <label for="def_addr1">Address Line 1</label>
+        <input type="text" id="def_addr1" autocomplete="off">
+      </div>
+      <div class="modal-field">
+        <label for="def_addr2">City / State / Zip</label>
+        <input type="text" id="def_addr2" autocomplete="off">
+      </div>
+      <div class="modal-field">
+        <label for="def_mkup">Default Markup</label>
+        <select id="def_mkup">
+          <option value="">(no default)</option>
+          <option value="1.54">65% = 1.54x</option>
+          <option value="1.43">70% = 1.43x</option>
+          <option value="1.33">75% = 1.33x</option>
+          <option value="1.25">80% = 1.25x</option>
+          <option value="1.18">85% = 1.18x</option>
+        </select>
+      </div>
+      <div class="modal-field">
+        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;">
+          <input type="checkbox" id="def_today_dates" style="width:auto;margin:0;">
+          Pre-fill Quote Date and Date In with today's date on new worksheets
+        </label>
       </div>
     </div>
     <div class="modal-foot">
@@ -696,9 +721,10 @@ function clearForm() {
   if (typeof refreshDirtyIndicator === 'function') refreshDirtyIndicator();
 }
 
-// ── Default Estimator / Contact / Contact Email ──
+// ── Default field values pre-filled on new / cleared worksheets ──
 var DEFAULTS_KEY = 'martech_defaults_v1';
-var DEFAULT_FIELDS = ['estimator', 'contact', 'contact_email'];
+var DEFAULT_FIELDS = ['estimator', 'contact', 'contact_email', 'addr1', 'addr2'];
+var MARKUP_VALUES = ['1.54', '1.43', '1.33', '1.25', '1.18'];
 
 function _readDefaults() {
   if (!_storageAvailable) return {};
@@ -716,8 +742,17 @@ function _writeDefaults(d) {
   catch (e) { alert('Could not save defaults — browser storage is full or unavailable.'); return false; }
 }
 
+function _todayMDY() {
+  var now = new Date();
+  var mm = String(now.getMonth() + 1).padStart(2, '0');
+  var dd = String(now.getDate()).padStart(2, '0');
+  var yyyy = now.getFullYear();
+  return mm + '/' + dd + '/' + yyyy;
+}
+
 function applyDefaultsToPrefix(prefix, force) {
   var d = _readDefaults();
+  // Text fields
   for (var i = 0; i < DEFAULT_FIELDS.length; i++) {
     var key = DEFAULT_FIELDS[i];
     var val = (typeof d[key] === 'string') ? d[key] : '';
@@ -725,6 +760,25 @@ function applyDefaultsToPrefix(prefix, force) {
     var el = document.getElementById(prefix + '_' + key);
     if (!el) continue;
     if (force || !el.value) el.value = val;
+  }
+  // Default Markup (select)
+  var mkup = (typeof d.mkup === 'string') ? d.mkup : '';
+  if (mkup && MARKUP_VALUES.indexOf(mkup) !== -1) {
+    var sel = document.getElementById(prefix + '_mkup');
+    if (sel) {
+      sel.value = mkup;
+      var freeN = (prefix === 'b') ? 63 : 18;
+      if (typeof recalcAll === 'function') recalcAll(prefix, freeN);
+    }
+  }
+  // Today's date pre-fill
+  if (d.today_dates) {
+    var today = _todayMDY();
+    var dateIds = ['_qdate', '_datein'];
+    for (var j = 0; j < dateIds.length; j++) {
+      var de = document.getElementById(prefix + dateIds[j]);
+      if (de && (force || !de.value)) de.value = today;
+    }
   }
 }
 
@@ -742,9 +796,17 @@ function openDefaultsDialog() {
   var e = document.getElementById('def_estimator');
   var c = document.getElementById('def_contact');
   var m = document.getElementById('def_contact_email');
+  var a1 = document.getElementById('def_addr1');
+  var a2 = document.getElementById('def_addr2');
+  var mk = document.getElementById('def_mkup');
+  var td = document.getElementById('def_today_dates');
   if (e) e.value = d.estimator || '';
   if (c) c.value = d.contact || '';
   if (m) m.value = d.contact_email || '';
+  if (a1) a1.value = d.addr1 || '';
+  if (a2) a2.value = d.addr2 || '';
+  if (mk) mk.value = (typeof d.mkup === 'string' && MARKUP_VALUES.indexOf(d.mkup) !== -1) ? d.mkup : '';
+  if (td) td.checked = !!d.today_dates;
   var modal = document.getElementById('defaultsModal');
   if (modal) modal.classList.add('open');
   setTimeout(function() { if (e) e.focus(); }, 0);
@@ -759,10 +821,20 @@ function saveDefaultsDialog() {
   var e = document.getElementById('def_estimator');
   var c = document.getElementById('def_contact');
   var m = document.getElementById('def_contact_email');
+  var a1 = document.getElementById('def_addr1');
+  var a2 = document.getElementById('def_addr2');
+  var mk = document.getElementById('def_mkup');
+  var td = document.getElementById('def_today_dates');
+  var mkVal = mk ? mk.value : '';
+  if (mkVal && MARKUP_VALUES.indexOf(mkVal) === -1) mkVal = '';
   var d = {
     estimator: e ? e.value.trim() : '',
     contact: c ? c.value.trim() : '',
-    contact_email: m ? m.value.trim() : ''
+    contact_email: m ? m.value.trim() : '',
+    addr1: a1 ? a1.value.trim() : '',
+    addr2: a2 ? a2.value.trim() : '',
+    mkup: mkVal,
+    today_dates: !!(td && td.checked)
   };
   if (_writeDefaults(d)) closeDefaultsDialog();
 }
@@ -770,12 +842,13 @@ function saveDefaultsDialog() {
 function clearDefaults() {
   if (!confirm('Clear the saved defaults? New worksheets will no longer be pre-filled.')) return;
   _writeDefaults({});
-  var e = document.getElementById('def_estimator');
-  var c = document.getElementById('def_contact');
-  var m = document.getElementById('def_contact_email');
-  if (e) e.value = '';
-  if (c) c.value = '';
-  if (m) m.value = '';
+  var ids = ['def_estimator', 'def_contact', 'def_contact_email', 'def_addr1', 'def_addr2', 'def_mkup'];
+  for (var i = 0; i < ids.length; i++) {
+    var el = document.getElementById(ids[i]);
+    if (el) el.value = '';
+  }
+  var td = document.getElementById('def_today_dates');
+  if (td) td.checked = false;
 }
 
 // ── Auto-save / restore worksheet data via localStorage ──
