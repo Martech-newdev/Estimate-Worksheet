@@ -539,6 +539,7 @@ function switchTab(id) {
 }
 
 function clearForm() {
+  if (!confirm('Clear the form? This will erase all worksheet data on this page, including the auto-saved copy in your browser. This action cannot be undone.')) return;
   var pages = document.getElementsByClassName('tab-page');
   var active = null;
   for (var i = 0; i < pages.length; i++) {
@@ -561,13 +562,64 @@ function clearForm() {
   for (var i = 0; i < svs.length; i++) {
     svs[i].innerHTML = svs[i].id && svs[i].id.indexOf('_s_hrs') > -1 ? '0' : '$0.00';
   }
+  saveForm();
 }
+
+// ── Auto-save / restore worksheet data via localStorage ──
+var STORAGE_KEY = 'martech_worksheet_v1';
+var _saveTimer = null;
+
+function saveForm() {
+  try {
+    var data = {};
+    var els = document.querySelectorAll('input[id], textarea[id], select[id]');
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      if (el.type === 'button' || el.type === 'submit') continue;
+      data[el.id] = el.value;
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch (e) { /* storage unavailable — silently ignore */ }
+}
+
+function scheduleSave() {
+  if (_saveTimer) clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(saveForm, 250);
+}
+
+function restoreForm() {
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    var data = JSON.parse(raw);
+    if (!data) return;
+    for (var id in data) {
+      if (!Object.prototype.hasOwnProperty.call(data, id)) continue;
+      var el = document.getElementById(id);
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')) {
+        el.value = data[id];
+      }
+    }
+    recalcAll('a', 18);
+    recalcAll('b', 63);
+  } catch (e) { /* corrupt storage — ignore */ }
+}
+
+document.addEventListener('input', function(e) {
+  var t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) scheduleSave();
+});
+document.addEventListener('change', function(e) {
+  var t = e.target;
+  if (t && t.tagName === 'SELECT') scheduleSave();
+});
 
 window.onload = function() {
   buildSheet('a', 18);
   buildSheet('b', 63);
   var pages = document.getElementsByClassName('tab-page');
   for (var i = 0; i < pages.length; i++) pages[i].style.display = i === 0 ? 'block' : 'none';
+  restoreForm();
 };
 
 function generateQuote() {
