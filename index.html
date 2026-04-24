@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Job Estimate Worksheet</title>
+<script src="https://cdn.jsdelivr.net/npm/docx@8/build/index.umd.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&display=swap');
 
@@ -27,9 +28,10 @@
     text-transform: uppercase; padding: 8px 22px;
     border: none; border-radius: 3px; cursor: pointer;
   }
-  .btn-red  { background: #c0392b; color: #fff; }
-  .btn-dark { background: #2c2c2c; color: #fff; }
-  .btn-blue { background: #1a5276; color: #fff; }
+  .btn-red   { background: #c0392b; color: #fff; }
+  .btn-dark  { background: #2c2c2c; color: #fff; }
+  .btn-blue  { background: #1a5276; color: #fff; }
+  .btn-green { background: #1e8449; color: #fff; }
 
   .form-card {
     background: #f4f4f2;
@@ -210,6 +212,7 @@
   <button class="btn btn-blue" onclick="switchTab('tab1')">1-Page (18 rows)</button>
   <button class="btn btn-blue" onclick="switchTab('tab2')">2-Page (63 rows)</button>
   <span style="display:inline-block;width:1px;height:24px;background:#aaa;"></span>
+  <button class="btn btn-green" onclick="generateQuote()">&#128196; Generate Word Quote</button>
   <button class="btn btn-red"  onclick="window.print()">&#128424; Print / Save PDF</button>
   <button class="btn btn-dark" onclick="clearForm()">&#8635; Clear Form</button>
 </div>
@@ -387,6 +390,7 @@
 </div>
 
 <div class="controls" style="margin-top:14px;">
+  <button class="btn btn-green" onclick="generateQuote()">&#128196; Generate Word Quote</button>
   <button class="btn btn-red"  onclick="window.print()">&#128424; Print / Save PDF</button>
   <button class="btn btn-dark" onclick="clearForm()">&#8635; Clear Form</button>
 </div>
@@ -565,6 +569,210 @@ window.onload = function() {
   var pages = document.getElementsByClassName('tab-page');
   for (var i = 0; i < pages.length; i++) pages[i].style.display = i === 0 ? 'block' : 'none';
 };
+
+function generateQuote() {
+  if (!window.docx) {
+    alert('Word document library is still loading. Please try again in a moment.');
+    return;
+  }
+  var D = window.docx;
+  var AT = D.AlignmentType;
+  var WU = D.WidthType;
+  var BS = D.BorderStyle;
+
+  // Determine active tab prefix
+  var p = 'a';
+  var pages = document.getElementsByClassName('tab-page');
+  for (var i = 0; i < pages.length; i++) {
+    if (pages[i].style.display !== 'none') { p = (pages[i].id === 'tab2') ? 'b' : 'a'; break; }
+  }
+  var freeN = (p === 'a') ? 18 : 63;
+
+  // Read meta fields
+  function gField(id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; }
+  var qdate     = gField(p + '_qdate');
+  var cust      = gField(p + '_cust');
+  var contact   = gField(p + '_contact');
+  var jobnum    = gField(p + '_jobnum');
+  var proj      = gField(p + '_proj');
+  var estimator = gField(p + '_estimator');
+  var notes     = gField(p + '_notes');
+
+  // Read display totals
+  function gText(id) { var el = document.getElementById(id); return el ? el.textContent.trim() : '$0.00'; }
+  var labTotal   = gText(p + '_s_lab');
+  var matTotal   = gText(p + '_s_mat');
+  var grandTotal = gText(p + '_s_tot');
+
+  // Collect scope items from free rows
+  var scopeItems = [];
+  for (var i = 0; i < freeN; i++) {
+    var descEl = document.getElementById(p + '_d_' + i);
+    var hrsEl  = document.getElementById(p + '_h_' + i);
+    var desc = descEl ? descEl.value.trim() : '';
+    var hrs  = hrsEl  ? parseFloat(hrsEl.value) : 0;
+    if (desc || hrs > 0) scopeItems.push(desc || '(unlabeled task)');
+  }
+  // Fixed rows with hours entered
+  for (var f = 0; f < 8; f++) {
+    var hrsEl = document.getElementById(p + '_h_f' + f);
+    var hrs = hrsEl ? parseFloat(hrsEl.value) : 0;
+    if (hrs > 0 && FIXED_LABOR[f]) scopeItems.push(FIXED_LABOR[f]);
+  }
+
+  var rangeText = '';
+  if (scopeItems.length === 1) rangeText = 'work outlined in the 1.1 section of this proposal';
+  else if (scopeItems.length > 1) rangeText = 'work outlined in the 1.1 thru 1.' + scopeItems.length + ' section of this proposal';
+
+  // Helpers
+  var noBorder = { style: BS.NONE, size: 0, color: 'FFFFFF' };
+  var noBorders = { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder };
+
+  function run(text, opts) {
+    opts = opts || {};
+    return new D.TextRun({ text: text, bold: opts.bold || false, size: opts.size || 22, font: opts.font || 'Calibri', underline: opts.underline || undefined, color: opts.color || '000000' });
+  }
+
+  function para(children, opts) {
+    opts = opts || {};
+    if (typeof children === 'string') children = [run(children, opts)];
+    return new D.Paragraph({ alignment: opts.align || AT.LEFT, spacing: { after: opts.spaceAfter !== undefined ? opts.spaceAfter : 140 }, children: children });
+  }
+
+  function blank() { return new D.Paragraph({ children: [new D.TextRun('')], spacing: { after: 80 } }); }
+
+  // Scope item paragraphs
+  var scopeParas = [];
+  for (var s = 0; s < scopeItems.length; s++) {
+    scopeParas.push(para([run('1.' + (s + 1) + '\u00a0\u00a0' + scopeItems[s])], { spaceAfter: 80 }));
+  }
+  if (scopeParas.length === 0) scopeParas.push(para('(No scope items entered)'));
+
+  // Notes paragraphs
+  var notesParas = [];
+  if (notes) {
+    var lines = notes.split('\n');
+    for (var n = 0; n < lines.length; n++) {
+      var ln = lines[n].trim();
+      if (ln) notesParas.push(para([run('\u2022\u00a0\u00a0' + ln)], { spaceAfter: 80 }));
+    }
+  }
+  if (notesParas.length === 0) notesParas.push(para('(No notes entered)'));
+
+  // Cost table helper
+  function cellP(text, opts) {
+    opts = opts || {};
+    return new D.Paragraph({ alignment: opts.align || AT.LEFT, spacing: { after: 60 }, children: [run(text, opts)] });
+  }
+  function tcell(text, opts, width) {
+    opts = opts || {};
+    return new D.TableCell({
+      borders: noBorders,
+      width: { size: width || 50, type: WU.PERCENTAGE },
+      children: [cellP(text, opts)]
+    });
+  }
+
+  var costTable = new D.Table({
+    width: { size: 75, type: WU.PERCENTAGE },
+    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder, insideH: noBorder, insideV: noBorder },
+    rows: [
+      new D.TableRow({ children: [ tcell('Labor', {}, 40), tcell(labTotal, {}, 60) ] }),
+      new D.TableRow({ children: [ tcell('Parts', {}, 40), tcell(matTotal, {}, 60) ] }),
+      new D.TableRow({ children: [
+        new D.TableCell({
+          borders: noBorders,
+          columnSpan: 2,
+          children: [ new D.Paragraph({ alignment: AT.RIGHT, spacing: { after: 60 }, children: [
+            run('Project Estimate\u00a0\u00a0' + grandTotal + '\u00a0+ tax & frt.', { bold: true })
+          ]}) ]
+        })
+      ]})
+    ]
+  });
+
+  // Assemble document children
+  var ch = [];
+
+  // Date + quote number
+  ch.push(para([run(qdate || 'Date: ___________')]));
+  if (jobnum) ch.push(para([run('(Quote #' + jobnum + ')')], { spaceAfter: 80 }));
+  ch.push(blank());
+
+  // Customer block
+  if (cust) ch.push(para([run(cust)]));
+  ch.push(blank());
+
+  // Attention
+  ch.push(para([run('Attention:\u00a0\u00a0' + (contact || '___________'))]));
+  ch.push(blank());
+
+  // Subject
+  ch.push(para([run('Subject:\u00a0\u00a0', { bold: true }), run(proj || '(Project Name)')], { spaceAfter: 200 }));
+  ch.push(blank());
+
+  // SCOPE OF SERVICES
+  ch.push(para([run('SCOPE OF SERVICES', { bold: true, size: 24, underline: {} })], { spaceAfter: 80 }));
+  ch.push(blank());
+  for (var s = 0; s < scopeParas.length; s++) ch.push(scopeParas[s]);
+  ch.push(blank());
+
+  // COST OF SERVICES
+  ch.push(para([run('COST OF SERVICES', { bold: true, size: 24, underline: {} })], { spaceAfter: 80 }));
+  ch.push(blank());
+
+  if (rangeText) {
+    ch.push(para([run('FULL SCOPE of Services')], { spaceAfter: 80 }));
+    ch.push(para([run('The Services inclusive of ' + rangeText + ' can be performed for:')], { spaceAfter: 160 }));
+  }
+
+  ch.push(costTable);
+  ch.push(blank());
+  ch.push(para([run('This is a T&M estimate; actual hours will be charged.')]));
+  ch.push(blank());
+
+  // NOTES & EXCLUSIONS
+  ch.push(para([run('NOTES & EXCLUSIONS', { bold: true, size: 24, underline: {} })], { spaceAfter: 80 }));
+  ch.push(blank());
+  for (var n = 0; n < notesParas.length; n++) ch.push(notesParas[n]);
+  ch.push(blank());
+  ch.push(blank());
+
+  // Closing
+  ch.push(para([run('Thank you for the opportunity to quote you on this project.')]));
+  ch.push(blank());
+  ch.push(blank());
+
+  // Signature block
+  var sigName = estimator || 'Ron Stephens';
+  ch.push(para([run(sigName, { bold: true })], { spaceAfter: 60 }));
+  ch.push(para([run('General Manager')], { spaceAfter: 60 }));
+  ch.push(para([run('Rons@mar-tech.com')], { spaceAfter: 60 }));
+  ch.push(para([run('(209) 333-8478 Main')], { spaceAfter: 60 }));
+  ch.push(para([run('(209) 445-4207 Cell')], { spaceAfter: 60 }));
+
+  var doc = new D.Document({
+    sections: [{
+      properties: { page: { margin: { top: 1080, right: 1080, bottom: 1080, left: 1080 } } },
+      children: ch
+    }]
+  });
+
+  D.Packer.toBlob(doc).then(function(blob) {
+    var custClean = cust.replace(/[^a-zA-Z0-9]/g, '').slice(0, 30) || 'Customer';
+    var numClean  = jobnum.replace(/[^a-zA-Z0-9]/g, '') || 'Quote';
+    var filename  = 'Quote_' + numClean + '_' + custClean + '.docx';
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function() { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
+  }).catch(function(err) {
+    console.error('Quote generation error:', err);
+    alert('Error generating Word document: ' + (err.message || err));
+  });
+}
 </script>
 </body>
 </html>
