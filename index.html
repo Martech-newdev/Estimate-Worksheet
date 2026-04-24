@@ -278,6 +278,8 @@
 </head>
 <body>
 
+<datalist id="cust_datalist"></datalist>
+
 <div class="controls">
   <button class="btn btn-blue" onclick="switchTab('tab1')">1-Page (18 rows)</button>
   <button class="btn btn-blue" onclick="switchTab('tab2')">2-Page (63 rows)</button>
@@ -313,7 +315,7 @@
   </div>
   <div class="meta-section">
     <div class="meta-row"><span class="meta-label">Quote Date:</span><input class="meta-input" type="text" id="a_qdate" placeholder="MM/DD/YYYY"></div>
-    <div class="meta-row"><span class="meta-label">Customer:</span><input class="meta-input" type="text" id="a_cust"></div>
+    <div class="meta-row"><span class="meta-label">Customer:</span><input class="meta-input" type="text" id="a_cust" list="cust_datalist" autocomplete="off" oninput="onCustomerPicked('a')" onchange="onCustomerPicked('a')"></div>
     <div class="meta-row meta-row-wide"><span class="meta-label">Address Line 1:</span><input class="meta-input" type="text" id="a_addr1"></div>
     <div class="meta-row meta-row-wide"><span class="meta-label">City/State/Zip:</span><input class="meta-input" type="text" id="a_addr2"></div>
     <div class="meta-row"><span class="meta-label">Contact:</span><input class="meta-input" type="text" id="a_contact"></div>
@@ -402,7 +404,7 @@
   </div>
   <div class="meta-section">
     <div class="meta-row"><span class="meta-label">Quote Date:</span><input class="meta-input" type="text" id="b_qdate" placeholder="MM/DD/YYYY"></div>
-    <div class="meta-row"><span class="meta-label">Customer:</span><input class="meta-input" type="text" id="b_cust"></div>
+    <div class="meta-row"><span class="meta-label">Customer:</span><input class="meta-input" type="text" id="b_cust" list="cust_datalist" autocomplete="off" oninput="onCustomerPicked('b')" onchange="onCustomerPicked('b')"></div>
     <div class="meta-row meta-row-wide"><span class="meta-label">Address Line 1:</span><input class="meta-input" type="text" id="b_addr1"></div>
     <div class="meta-row meta-row-wide"><span class="meta-label">City/State/Zip:</span><input class="meta-input" type="text" id="b_addr2"></div>
     <div class="meta-row"><span class="meta-label">Contact:</span><input class="meta-input" type="text" id="b_contact"></div>
@@ -1279,6 +1281,109 @@ function refreshWorksheetPicker() {
     html += '<option value="' + _escAttr(n) + '"' + (n === _currentWorksheetName ? ' selected' : '') + titleAttr + '>' + _escHtml(label) + '</option>';
   }
   sel.innerHTML = html;
+  refreshCustomerDatalist();
+}
+
+// ── Customer suggestions: pull recent customers from the worksheet library ──
+var CUSTOMER_PREFIXES = ['a', 'b'];
+
+function _collectCustomerSuggestions() {
+  var lib = _readLibrary();
+  var byKey = {}; // normalized name -> { name, addr1, addr2, contact, contact_email, savedAt }
+  var names = Object.keys(lib.items);
+  for (var i = 0; i < names.length; i++) {
+    var entry = lib.items[names[i]];
+    if (!entry || !entry.data) continue;
+    var ms = _savedAtMs(entry);
+    for (var p = 0; p < CUSTOMER_PREFIXES.length; p++) {
+      var pre = CUSTOMER_PREFIXES[p];
+      var nm = (entry.data[pre + '_cust'] || '').trim();
+      if (!nm) continue;
+      var key = nm.toLowerCase();
+      var cand = {
+        name: nm,
+        addr1: (entry.data[pre + '_addr1'] || '').trim(),
+        addr2: (entry.data[pre + '_addr2'] || '').trim(),
+        contact: (entry.data[pre + '_contact'] || '').trim(),
+        contact_email: (entry.data[pre + '_contact_email'] || '').trim(),
+        savedAt: ms
+      };
+      var prev = byKey[key];
+      if (!prev) { byKey[key] = cand; continue; }
+      // Newer entry wins for display name and is the base; fill any blank
+      // contact/address fields from the older entry so we keep the most
+      // complete picture of that customer.
+      if (cand.savedAt >= prev.savedAt) {
+        if (!cand.addr1 && prev.addr1) cand.addr1 = prev.addr1;
+        if (!cand.addr2 && prev.addr2) cand.addr2 = prev.addr2;
+        if (!cand.contact && prev.contact) cand.contact = prev.contact;
+        if (!cand.contact_email && prev.contact_email) cand.contact_email = prev.contact_email;
+        byKey[key] = cand;
+      } else {
+        if (!prev.addr1 && cand.addr1) prev.addr1 = cand.addr1;
+        if (!prev.addr2 && cand.addr2) prev.addr2 = cand.addr2;
+        if (!prev.contact && cand.contact) prev.contact = cand.contact;
+        if (!prev.contact_email && cand.contact_email) prev.contact_email = cand.contact_email;
+      }
+    }
+  }
+  var list = [];
+  for (var k in byKey) if (Object.prototype.hasOwnProperty.call(byKey, k)) list.push(byKey[k]);
+  list.sort(function(a, b) {
+    if (b.savedAt !== a.savedAt) return b.savedAt - a.savedAt;
+    return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+  });
+  return list;
+}
+
+function refreshCustomerDatalist() {
+  var dl = document.getElementById('cust_datalist');
+  if (!dl) return;
+  var list = _collectCustomerSuggestions();
+  var html = '';
+  for (var i = 0; i < list.length; i++) {
+    var s = list[i];
+    var bits = [];
+    if (s.addr1) bits.push(s.addr1);
+    else if (s.addr2) bits.push(s.addr2);
+    if (s.contact) bits.push(s.contact);
+    var label = bits.join(' \u2022 ');
+    html += '<option value="' + _escAttr(s.name) + '"' +
+            (label ? ' label="' + _escAttr(label) + '"' : '') + '></option>';
+  }
+  dl.innerHTML = html;
+}
+
+function _findCustomerSuggestion(name) {
+  if (!name) return null;
+  var key = String(name).trim().toLowerCase();
+  if (!key) return null;
+  var list = _collectCustomerSuggestions();
+  for (var i = 0; i < list.length; i++) {
+    if (list[i].name.toLowerCase() === key) return list[i];
+  }
+  return null;
+}
+
+function onCustomerPicked(prefix) {
+  var custEl = document.getElementById(prefix + '_cust');
+  if (!custEl) return;
+  var match = _findCustomerSuggestion(custEl.value);
+  if (!match) return;
+  // Normalize casing to the saved version for consistency
+  if (custEl.value !== match.name) custEl.value = match.name;
+  function fillIfBlank(id, val) {
+    if (!val) return;
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (!el.value || !el.value.trim()) el.value = val;
+  }
+  fillIfBlank(prefix + '_addr1', match.addr1);
+  fillIfBlank(prefix + '_addr2', match.addr2);
+  fillIfBlank(prefix + '_contact', match.contact);
+  fillIfBlank(prefix + '_contact_email', match.contact_email);
+  scheduleSave();
+  refreshDirtyIndicator();
 }
 
 function _escAttr(s) { return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;'); }

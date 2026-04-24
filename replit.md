@@ -12,6 +12,13 @@ Single-page tool for creating professional job estimates with:
 - A worksheet library: save the current worksheet under a name and switch
   between saved jobs without losing in-progress work. Browser auto-save still
   protects the unsaved active worksheet between visits.
+- A customer suggestion dropdown: the Customer field on both tabs offers a
+  datalist of customers seen in the saved worksheet library (most-recent
+  first). Picking or typing an exact match auto-fills any blank Address Line
+  1 / City-State-Zip / Contact / Contact Email from the most recent saved
+  worksheet for that customer. Existing non-blank fields are never
+  overwritten. Defaults dialog Customer continues to pre-fill new
+  worksheets independently.
 
 ## Storage
 
