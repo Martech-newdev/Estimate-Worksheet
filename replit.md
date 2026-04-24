@@ -103,6 +103,26 @@ Single-page tool for creating professional job estimates with:
   field matches an excluded name removes that name from the exclusion
   list automatically.
 
+## Word Quote Generation
+
+The "Generate Word Quote" button builds a `.docx` from the active worksheet
+using the `docx@8` UMD library loaded from CDN. The generated document uses
+real Word page-level decorations:
+
+- **Page header** (repeats on every page): MarTech letterhead with company
+  name, city, phone, and email.
+- **Page footer** (repeats on every page): Ron Stephens signature block
+  (name, title, email, main + cell phone).
+
+Scope of Services items are renumbered sequentially (`1.0`, `2.0`, `3.0`, …)
+in the order they appear on the worksheet, regardless of which worksheet
+row they came from. Free labor rows are included when the description is
+filled or hours are entered; fixed overhead rows (MOBILIZATION / DEMOB,
+PROJECT MANAGEMENT, etc.) are included when hours or rate is entered.
+
+The Attention line renders as `Name | email`, with the email as a clickable
+`mailto:` hyperlink when both Contact and Contact Email are filled.
+
 ## Tech Stack
 
 - **Frontend:** Pure HTML5, CSS3, vanilla JavaScript (no frameworks or build tools)

@@ -3183,7 +3183,9 @@ function generateQuote() {
   var matTotal   = gText(p + '_s_mat');
   var grandTotal = gText(p + '_s_tot');
 
-  // Collect scope items — each entry stores { num: rowLabel, text: description }
+  // Collect scope items in the order they appear on the worksheet.
+  // Numbering is assigned sequentially below (1.0, 2.0, 3.0, …) regardless
+  // of which worksheet row they came from.
   // Free rows: include when description is filled OR hours > 0 (rate alone is not enough)
   var scopeItems = [];
   for (var i = 0; i < freeN; i++) {
@@ -3191,7 +3193,7 @@ function generateQuote() {
     var hrsEl  = document.getElementById(p + '_h_' + i);
     var desc = descEl ? descEl.value.trim() : '';
     var hrs  = hrsEl  ? parseFloat(hrsEl.value) : 0;
-    if (desc || hrs > 0) scopeItems.push({ num: (i + 1) + '.0', text: desc || '(unlabeled task)' });
+    if (desc || hrs > 0) scopeItems.push({ text: desc || '(unlabeled task)' });
   }
   // Fixed overhead rows: include when hours OR rate is entered (rate-only is meaningful here)
   for (var f = 0; f < 8; f++) {
@@ -3200,8 +3202,12 @@ function generateQuote() {
     var hrs  = hrsEl  ? parseFloat(hrsEl.value) : 0;
     var rate = rateEl ? parseFloat(rateEl.value) : 0;
     if ((hrs > 0 || rate > 0) && FIXED_LABOR[f]) {
-      scopeItems.push({ num: (freeN + f + 1) + '.0', text: FIXED_LABOR[f] });
+      scopeItems.push({ text: FIXED_LABOR[f] });
     }
+  }
+  // Assign sequential 1.0, 2.0, 3.0, … numbering
+  for (var k = 0; k < scopeItems.length; k++) {
+    scopeItems[k].num = (k + 1) + '.0';
   }
 
   var rangeText = '';
@@ -3286,31 +3292,7 @@ function generateQuote() {
   // Assemble document children
   var ch = [];
 
-  // ── MarTech Letterhead ──
-  ch.push(new D.Paragraph({
-    alignment: AT.LEFT,
-    spacing: { after: 40 },
-    children: [new D.TextRun({ text: 'MarTech', bold: true, size: 36, font: 'Calibri', color: '1a1a1a' })]
-  }));
-  ch.push(new D.Paragraph({
-    alignment: AT.LEFT,
-    spacing: { after: 40 },
-    children: [new D.TextRun({ text: 'Mechanical Analysis and Repair', size: 22, font: 'Calibri', color: '444444' })]
-  }));
-  ch.push(new D.Paragraph({
-    alignment: AT.LEFT,
-    spacing: { after: 40 },
-    children: [new D.TextRun({ text: 'Lodi, CA', size: 22, font: 'Calibri', color: '444444' })]
-  }));
-  ch.push(new D.Paragraph({
-    alignment: AT.LEFT,
-    spacing: { after: 40 },
-    children: [new D.TextRun({ text: '(209) 333-8478 \u00a0|\u00a0 Rons@mar-tech.com', size: 20, font: 'Calibri', color: '444444' })]
-  }));
-  ch.push(blank());
-  ch.push(blank());
-
-  // Date + quote number + estimator (internal reference)
+  // Date + quote number + prepared-by (matches template body opening)
   ch.push(para([run('Date:\u00a0\u00a0' + (qdate || '___________'))]));
   if (jobnum)    ch.push(para([run('Quote #' + jobnum)], { spaceAfter: 40 }));
   if (estimator) ch.push(para([run('Prepared by:\u00a0\u00a0' + estimator)], { spaceAfter: 40 }));
@@ -3322,16 +3304,15 @@ function generateQuote() {
   if (addr2) ch.push(para([run(addr2)]));
   ch.push(blank());
 
-  // Attention — render email as a clickable mailto hyperlink when provided
+  // Attention — uses "Name | email" with email as a clickable mailto hyperlink when provided
   if (contact && contactEmail) {
     var emailLink = new D.ExternalHyperlink({
       link: 'mailto:' + contactEmail,
       children: [run(contactEmail, { color: '0563C1', underline: {} })]
     });
     ch.push(para([
-      run('Attention:\u00a0\u00a0' + contact + ' <'),
-      emailLink,
-      run('>')
+      run('Attention:\u00a0\u00a0' + contact + '\u00a0|\u00a0'),
+      emailLink
     ]));
   } else {
     var attentionText = contact ? contact : '___________';
@@ -3370,21 +3351,49 @@ function generateQuote() {
   ch.push(blank());
   ch.push(blank());
 
-  // Closing
+  // Closing — signature block is rendered in the page footer below
   ch.push(para([run('Thank you for the opportunity to quote you on this project.')]));
-  ch.push(blank());
-  ch.push(blank());
 
-  // Signature block — always Ron Stephens as the standard MarTech signatory
-  ch.push(para([run('Ron Stephens', { bold: true })], { spaceAfter: 60 }));
-  ch.push(para([run('General Manager')], { spaceAfter: 60 }));
-  ch.push(para([run('Rons@mar-tech.com')], { spaceAfter: 60 }));
-  ch.push(para([run('(209) 333-8478 Main')], { spaceAfter: 60 }));
-  ch.push(para([run('(209) 445-4207 Cell')], { spaceAfter: 60 }));
+  // ── Page header (repeats on every page): MarTech letterhead ──
+  function headerLine(text, opts) {
+    opts = opts || {};
+    return new D.Paragraph({
+      alignment: AT.LEFT,
+      spacing: { after: opts.spaceAfter !== undefined ? opts.spaceAfter : 40 },
+      children: [new D.TextRun({
+        text: text,
+        bold: opts.bold || false,
+        size: opts.size || 22,
+        font: 'Calibri',
+        color: opts.color || '444444'
+      })]
+    });
+  }
+  var pageHeader = new D.Header({
+    children: [
+      headerLine('MarTech - Mechanical Analysis and Repair', { bold: true, size: 26, color: '1a1a1a' }),
+      headerLine('Lodi, CA \u00a0\u00a0(209) 333-8478\u00a0|\u00a0Rons@mar-tech.com', { size: 20, spaceAfter: 120 })
+    ]
+  });
+
+  // ── Page footer (repeats on every page): Ron Stephens signature block ──
+  var pageFooter = new D.Footer({
+    children: [
+      headerLine('Ron Stephens', { bold: true, size: 22, color: '1a1a1a', spaceAfter: 20 }),
+      headerLine('General Manager', { size: 20, spaceAfter: 20 }),
+      headerLine('Rons@mar-tech.com', { size: 20, spaceAfter: 20 }),
+      headerLine('(209) 333-8478 Main', { size: 20, spaceAfter: 20 }),
+      headerLine('(209) 445-4207 Cell', { size: 20, spaceAfter: 0 })
+    ]
+  });
 
   var doc = new D.Document({
     sections: [{
-      properties: { page: { margin: { top: 1080, right: 1080, bottom: 1080, left: 1080 } } },
+      properties: {
+        page: { margin: { top: 1800, right: 1080, bottom: 2160, left: 1080 } }
+      },
+      headers: { default: pageHeader },
+      footers: { default: pageFooter },
       children: ch
     }]
   });
