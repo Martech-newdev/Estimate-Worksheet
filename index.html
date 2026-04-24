@@ -58,7 +58,7 @@
   .ws-picker select {
     font-family: 'Barlow', sans-serif; font-size: 13px;
     padding: 5px 6px; border: 1px solid #aaa; border-radius: 3px;
-    background: #fff; min-width: 170px; max-width: 240px;
+    background: #fff; min-width: 240px; max-width: 360px;
   }
   .ws-picker .btn { padding: 6px 12px; font-size: 12px; }
 
@@ -836,11 +836,51 @@ function refreshDirtyIndicator() {
   }
 }
 
+function _savedAtMs(entry) {
+  if (!entry || !entry.savedAt) return 0;
+  var t = Date.parse(entry.savedAt);
+  return isNaN(t) ? 0 : t;
+}
+
+function _formatRelativeTime(ms) {
+  if (!ms) return 'never saved';
+  var diff = Date.now() - ms;
+  if (diff < 0) diff = 0;
+  var sec = Math.floor(diff / 1000);
+  if (sec < 45) return 'just now';
+  var min = Math.floor(sec / 60);
+  if (min < 2) return '1 minute ago';
+  if (min < 60) return min + ' minutes ago';
+  var hr = Math.floor(min / 60);
+  if (hr < 2) return '1 hour ago';
+  if (hr < 24) return hr + ' hours ago';
+  var day = Math.floor(hr / 24);
+  if (day < 2) return 'yesterday';
+  if (day < 7) return day + ' days ago';
+  var wk = Math.floor(day / 7);
+  if (wk < 2) return '1 week ago';
+  if (day < 30) return wk + ' weeks ago';
+  var mo = Math.floor(day / 30);
+  if (mo < 2) return '1 month ago';
+  if (mo < 12) return mo + ' months ago';
+  var yr = Math.floor(day / 365);
+  if (yr < 2) return '1 year ago';
+  return yr + ' years ago';
+}
+
+function _formatSavedAtAbsolute(ms) {
+  if (!ms) return '';
+  try { return new Date(ms).toLocaleString(); } catch (e) { return ''; }
+}
+
 function refreshWorksheetPicker() {
   var sel = document.getElementById('wsPicker');
   if (!sel) return;
   var lib = _readLibrary();
   var names = Object.keys(lib.items).sort(function(a, b) {
+    var ta = _savedAtMs(lib.items[a]);
+    var tb = _savedAtMs(lib.items[b]);
+    if (tb !== ta) return tb - ta;
     return a.toLowerCase().localeCompare(b.toLowerCase());
   });
   var html = '';
@@ -852,8 +892,11 @@ function refreshWorksheetPicker() {
   }
   for (var i = 0; i < names.length; i++) {
     var n = names[i];
-    var label = n + (n === _currentWorksheetName ? '  •' : '');
-    html += '<option value="' + _escAttr(n) + '"' + (n === _currentWorksheetName ? ' selected' : '') + '>' + _escHtml(label) + '</option>';
+    var ms = _savedAtMs(lib.items[n]);
+    var rel = _formatRelativeTime(ms);
+    var label = n + ' — saved ' + rel + (n === _currentWorksheetName ? '  •' : '');
+    var titleAttr = ms ? ' title="' + _escAttr('Last saved: ' + _formatSavedAtAbsolute(ms)) + '"' : '';
+    html += '<option value="' + _escAttr(n) + '"' + (n === _currentWorksheetName ? ' selected' : '') + titleAttr + '>' + _escHtml(label) + '</option>';
   }
   sel.innerHTML = html;
 }
