@@ -265,6 +265,111 @@
     padding: 10px 16px 14px;
   }
 
+  /* Customers dialog */
+  .modal-card.wide { width: 560px; }
+  .cust-list {
+    max-height: 60vh; overflow-y: auto;
+    border: 1px solid #d4d4d4; border-radius: 3px;
+    background: #fafafa;
+  }
+  .cust-empty {
+    padding: 18px 16px; text-align: center; color: #777;
+    font-style: italic; font-size: 13px;
+  }
+  .cust-row {
+    padding: 10px 12px; border-bottom: 1px solid #e3e3e3;
+    background: #fff;
+  }
+  .cust-row:last-child { border-bottom: none; }
+  .cust-row.editing { background: #f4f8fb; }
+  .cust-row-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 8px;
+  }
+  .cust-name {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700; font-size: 15px; color: #1a5276;
+    letter-spacing: 0.3px;
+    word-break: break-word;
+    flex: 1 1 auto;
+  }
+  .cust-actions { display: flex; gap: 4px; flex-shrink: 0; }
+  .cust-actions .btn {
+    padding: 3px 9px; font-size: 11px; min-height: 0;
+    letter-spacing: 0.3px;
+  }
+  .cust-meta {
+    margin-top: 4px;
+    font-size: 12px; color: #444; line-height: 1.4;
+  }
+  .cust-meta .cust-blank { color: #999; font-style: italic; }
+  .cust-count {
+    margin-top: 4px;
+    font-size: 11px; color: #777;
+    font-family: 'Barlow Condensed', sans-serif;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .cust-edit-form {
+    margin-top: 8px;
+    padding: 8px 10px; background: #fff;
+    border: 1px solid #cdd9e2; border-radius: 3px;
+  }
+  .cust-edit-form .modal-field { margin-bottom: 6px; }
+  .cust-edit-form .modal-field label {
+    margin-bottom: 2px; font-size: 11px;
+  }
+  .cust-edit-form .modal-field input {
+    font-size: 12px; padding: 4px 6px;
+  }
+  .cust-edit-foot {
+    display: flex; justify-content: flex-end; gap: 6px;
+    margin-top: 8px;
+  }
+  .cust-edit-foot .btn { padding: 4px 10px; font-size: 11px; min-height: 0; }
+  .cust-merge-row {
+    margin-top: 8px;
+    padding: 8px 10px; background: #fff;
+    border: 1px solid #cdd9e2; border-radius: 3px;
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  }
+  .cust-merge-row label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 12px; font-weight: 700; color: #555;
+    text-transform: uppercase; letter-spacing: 0.4px;
+  }
+  .cust-merge-row select {
+    flex: 1 1 180px; padding: 4px 6px;
+    font-family: 'Barlow', sans-serif; font-size: 12px;
+    border: 1.5px solid #aaa; border-radius: 2px;
+  }
+  .cust-merge-row .btn { padding: 4px 10px; font-size: 11px; min-height: 0; }
+  .cust-delete-row {
+    margin-top: 8px;
+    padding: 8px 10px; background: #fff7f4;
+    border: 1px solid #e8c0b4; border-radius: 3px;
+  }
+  .cust-delete-row .cust-del-msg {
+    font-size: 12px; color: #6b1a0c; margin-bottom: 6px;
+  }
+  .cust-delete-row label {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: #444;
+    font-family: 'Barlow', sans-serif; font-weight: normal;
+    text-transform: none; letter-spacing: 0;
+    margin-bottom: 6px;
+  }
+  .cust-delete-row label input {
+    width: auto; margin: 0;
+  }
+  .cust-delete-row .cust-edit-foot { margin-top: 4px; }
+  .cust-restore {
+    padding: 8px 12px; border-top: 1px solid #e3e3e3;
+    background: #fafafa; font-size: 12px; color: #555;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; flex-wrap: wrap;
+  }
+  .cust-restore .btn { padding: 3px 9px; font-size: 11px; min-height: 0; }
+
   @media print {
     body { background:#fff; padding:0; }
     .controls { display:none; }
@@ -290,6 +395,7 @@
   <button class="btn btn-blue" onclick="document.getElementById('importFile').click()">&#128194; Load from File</button>
   <button class="btn btn-dark" onclick="clearForm()">&#8635; Clear Form</button>
   <button class="btn btn-blue" onclick="openDefaultsDialog()" title="Set company-wide defaults (estimator, contact, address, markup, dates, customer, job number, project name, due date) to pre-fill on new worksheets">&#9881;&#65039; Defaults&hellip;</button>
+  <button class="btn btn-blue" onclick="openCustomersDialog()" title="Edit, merge, or delete customers from the suggestion dropdown">&#128100; Customers&hellip;</button>
   <input type="file" id="importFile" accept=".json,application/json" style="display:none" onchange="importFromFile(event)">
   <span id="saveStatus" class="save-status" aria-live="polite">Not saved yet</span>
 </div>
@@ -491,6 +597,7 @@
   <button class="btn btn-blue" onclick="document.getElementById('importFile').click()">&#128194; Load from File</button>
   <button class="btn btn-dark" onclick="clearForm()">&#8635; Clear Form</button>
   <button class="btn btn-blue" onclick="openDefaultsDialog()" title="Set company-wide defaults (estimator, contact, address, markup, dates, customer, job number, project name, due date) to pre-fill on new worksheets">&#9881;&#65039; Defaults&hellip;</button>
+  <button class="btn btn-blue" onclick="openCustomersDialog()" title="Edit, merge, or delete customers from the suggestion dropdown">&#128100; Customers&hellip;</button>
 </div>
 
 <div class="modal-overlay" id="defaultsModal" role="dialog" aria-modal="true" aria-labelledby="defaultsModalTitle">
@@ -562,6 +669,19 @@
       <button class="btn btn-dark" onclick="clearDefaults()">Clear Defaults</button>
       <button class="btn btn-blue" onclick="closeDefaultsDialog()">Cancel</button>
       <button class="btn btn-green" onclick="saveDefaultsDialog()">Save Defaults</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="customersModal" role="dialog" aria-modal="true" aria-labelledby="customersModalTitle">
+  <div class="modal-card wide">
+    <div class="modal-head" id="customersModalTitle">Customers</div>
+    <div class="modal-body">
+      <div class="hint">Customers shown here are collected from your saved worksheets. Edit fixes typos and updates the contact info used to autofill new quotes; Merge consolidates two entries by renaming one across all saved worksheets; Delete removes the customer from the suggestion dropdown (and optionally clears its info from saved worksheets).</div>
+      <div class="cust-list" id="customersList"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-blue" onclick="closeCustomersDialog()">Close</button>
     </div>
   </div>
 </div>
@@ -1310,9 +1430,50 @@ function refreshWorksheetPicker() {
 
 // ── Customer suggestions: pull recent customers from the worksheet library ──
 var CUSTOMER_PREFIXES = ['a', 'b'];
+var CUSTOMER_EXCLUSIONS_KEY = 'martech_customer_exclusions_v1';
+
+function _readCustomerExclusions() {
+  if (!_storageAvailable) return {};
+  try {
+    var raw = localStorage.getItem(CUSTOMER_EXCLUSIONS_KEY);
+    if (!raw) return {};
+    var arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return {};
+    var out = {};
+    for (var i = 0; i < arr.length; i++) {
+      if (typeof arr[i] === 'string' && arr[i]) out[arr[i].toLowerCase()] = true;
+    }
+    return out;
+  } catch (e) { return {}; }
+}
+
+function _writeCustomerExclusions(map) {
+  if (!_storageAvailable) return false;
+  try {
+    var arr = [];
+    for (var k in map) {
+      if (Object.prototype.hasOwnProperty.call(map, k) && map[k]) arr.push(k);
+    }
+    localStorage.setItem(CUSTOMER_EXCLUSIONS_KEY, JSON.stringify(arr));
+    return true;
+  } catch (e) { return false; }
+}
+
+function _autoUnexcludeFromData(data) {
+  if (!data) return;
+  var ex = _readCustomerExclusions();
+  var changed = false;
+  for (var p = 0; p < CUSTOMER_PREFIXES.length; p++) {
+    var pre = CUSTOMER_PREFIXES[p];
+    var nm = (data[pre + '_cust'] || '').trim().toLowerCase();
+    if (nm && ex[nm]) { delete ex[nm]; changed = true; }
+  }
+  if (changed) _writeCustomerExclusions(ex);
+}
 
 function _collectCustomerSuggestions() {
   var lib = _readLibrary();
+  var excluded = _readCustomerExclusions();
   var byKey = {}; // normalized name -> { name, addr1, addr2, contact, contact_email, savedAt }
   var names = Object.keys(lib.items);
   for (var i = 0; i < names.length; i++) {
@@ -1324,6 +1485,7 @@ function _collectCustomerSuggestions() {
       var nm = (entry.data[pre + '_cust'] || '').trim();
       if (!nm) continue;
       var key = nm.toLowerCase();
+      if (excluded[key]) continue;
       var cand = {
         name: nm,
         addr1: (entry.data[pre + '_addr1'] || '').trim(),
@@ -1413,6 +1575,491 @@ function onCustomerPicked(prefix) {
 function _escAttr(s) { return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;'); }
 function _escHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
+// ── Customer management dialog ──
+var _editingCustomerKey = null;
+var _customerActionMode = null; // 'edit' | 'merge' | 'delete'
+
+function _collectCustomersForManagement() {
+  var lib = _readLibrary();
+  var excluded = _readCustomerExclusions();
+  var byKey = {};
+  var names = Object.keys(lib.items);
+  for (var i = 0; i < names.length; i++) {
+    var entry = lib.items[names[i]];
+    if (!entry || !entry.data) continue;
+    var ms = _savedAtMs(entry);
+    for (var p = 0; p < CUSTOMER_PREFIXES.length; p++) {
+      var pre = CUSTOMER_PREFIXES[p];
+      var nm = (entry.data[pre + '_cust'] || '').trim();
+      if (!nm) continue;
+      var key = nm.toLowerCase();
+      var cand = {
+        name: nm,
+        addr1: (entry.data[pre + '_addr1'] || '').trim(),
+        addr2: (entry.data[pre + '_addr2'] || '').trim(),
+        contact: (entry.data[pre + '_contact'] || '').trim(),
+        contact_email: (entry.data[pre + '_contact_email'] || '').trim(),
+        savedAt: ms
+      };
+      var prev = byKey[key];
+      if (!prev) {
+        byKey[key] = {
+          key: key,
+          name: cand.name,
+          addr1: cand.addr1, addr2: cand.addr2,
+          contact: cand.contact, contact_email: cand.contact_email,
+          savedAt: cand.savedAt,
+          excluded: !!excluded[key],
+          worksheets: {}
+        };
+        prev = byKey[key];
+      } else {
+        if (cand.savedAt >= prev.savedAt) {
+          prev.name = cand.name;
+          prev.savedAt = cand.savedAt;
+          if (cand.addr1) prev.addr1 = cand.addr1;
+          if (cand.addr2) prev.addr2 = cand.addr2;
+          if (cand.contact) prev.contact = cand.contact;
+          if (cand.contact_email) prev.contact_email = cand.contact_email;
+        } else {
+          if (!prev.addr1 && cand.addr1) prev.addr1 = cand.addr1;
+          if (!prev.addr2 && cand.addr2) prev.addr2 = cand.addr2;
+          if (!prev.contact && cand.contact) prev.contact = cand.contact;
+          if (!prev.contact_email && cand.contact_email) prev.contact_email = cand.contact_email;
+        }
+      }
+      if (!prev.worksheets[names[i]]) prev.worksheets[names[i]] = true;
+    }
+  }
+  var list = [];
+  for (var k in byKey) {
+    if (!Object.prototype.hasOwnProperty.call(byKey, k)) continue;
+    var c = byKey[k];
+    c.worksheetCount = Object.keys(c.worksheets).length;
+    list.push(c);
+  }
+  list.sort(function(a, b) {
+    if (a.excluded !== b.excluded) return a.excluded ? 1 : -1;
+    if (b.savedAt !== a.savedAt) return b.savedAt - a.savedAt;
+    return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+  });
+  return list;
+}
+
+function _findCustomerByKey(key) {
+  var list = _collectCustomersForManagement();
+  for (var i = 0; i < list.length; i++) if (list[i].key === key) return list[i];
+  return null;
+}
+
+function _renameCustomerInLibrary(oldKey, newName) {
+  var lib = _readLibrary();
+  var changed = 0;
+  for (var name in lib.items) {
+    if (!Object.prototype.hasOwnProperty.call(lib.items, name)) continue;
+    var entry = lib.items[name];
+    if (!entry || !entry.data) continue;
+    var anyChange = false;
+    for (var p = 0; p < CUSTOMER_PREFIXES.length; p++) {
+      var pre = CUSTOMER_PREFIXES[p];
+      var cur = (entry.data[pre + '_cust'] || '').trim();
+      if (cur && cur.toLowerCase() === oldKey) {
+        if (entry.data[pre + '_cust'] !== newName) {
+          entry.data[pre + '_cust'] = newName;
+          anyChange = true;
+        }
+      }
+    }
+    if (anyChange) changed++;
+  }
+  if (changed > 0) _writeLibrary(lib);
+  return changed;
+}
+
+function _updateCustomerInfoInLibrary(oldKey, info) {
+  var lib = _readLibrary();
+  var changed = 0;
+  for (var name in lib.items) {
+    if (!Object.prototype.hasOwnProperty.call(lib.items, name)) continue;
+    var entry = lib.items[name];
+    if (!entry || !entry.data) continue;
+    var anyChange = false;
+    for (var p = 0; p < CUSTOMER_PREFIXES.length; p++) {
+      var pre = CUSTOMER_PREFIXES[p];
+      var cur = (entry.data[pre + '_cust'] || '').trim();
+      if (cur && cur.toLowerCase() === oldKey) {
+        var pairs = [
+          ['_cust', info.name],
+          ['_addr1', info.addr1],
+          ['_addr2', info.addr2],
+          ['_contact', info.contact],
+          ['_contact_email', info.contact_email]
+        ];
+        for (var j = 0; j < pairs.length; j++) {
+          var fid = pairs[j][0];
+          var val = pairs[j][1];
+          if (entry.data[pre + fid] !== val) {
+            entry.data[pre + fid] = val;
+            anyChange = true;
+          }
+        }
+      }
+    }
+    if (anyChange) changed++;
+  }
+  if (changed > 0) _writeLibrary(lib);
+  return changed;
+}
+
+function _clearCustomerFromLibrary(key, alsoClearInfo) {
+  var lib = _readLibrary();
+  var changed = 0;
+  for (var name in lib.items) {
+    if (!Object.prototype.hasOwnProperty.call(lib.items, name)) continue;
+    var entry = lib.items[name];
+    if (!entry || !entry.data) continue;
+    var anyChange = false;
+    for (var p = 0; p < CUSTOMER_PREFIXES.length; p++) {
+      var pre = CUSTOMER_PREFIXES[p];
+      var cur = (entry.data[pre + '_cust'] || '').trim();
+      if (cur && cur.toLowerCase() === key) {
+        entry.data[pre + '_cust'] = '';
+        anyChange = true;
+        if (alsoClearInfo) {
+          entry.data[pre + '_addr1'] = '';
+          entry.data[pre + '_addr2'] = '';
+          entry.data[pre + '_contact'] = '';
+          entry.data[pre + '_contact_email'] = '';
+        }
+      }
+    }
+    if (anyChange) changed++;
+  }
+  if (changed > 0) _writeLibrary(lib);
+  return changed;
+}
+
+function _applyCustomerChangesToActiveForm(oldKey, info, action) {
+  for (var p = 0; p < CUSTOMER_PREFIXES.length; p++) {
+    var pre = CUSTOMER_PREFIXES[p];
+    var custEl = document.getElementById(pre + '_cust');
+    if (!custEl) continue;
+    var cur = (custEl.value || '').trim();
+    if (!cur || cur.toLowerCase() !== oldKey) continue;
+    if (action === 'clear') {
+      custEl.value = '';
+      if (info && info.alsoClearInfo) {
+        var ids = ['_addr1', '_addr2', '_contact', '_contact_email'];
+        for (var i = 0; i < ids.length; i++) {
+          var el = document.getElementById(pre + ids[i]);
+          if (el) el.value = '';
+        }
+      }
+    } else if (action === 'update') {
+      custEl.value = info.name;
+      var pairs = [['_addr1','addr1'], ['_addr2','addr2'], ['_contact','contact'], ['_contact_email','contact_email']];
+      for (var j = 0; j < pairs.length; j++) {
+        var el2 = document.getElementById(pre + pairs[j][0]);
+        if (el2) el2.value = info[pairs[j][1]] || '';
+      }
+    } else { // 'rename'
+      custEl.value = info.name;
+    }
+  }
+}
+
+function _refreshBaselineIfLoaded() {
+  if (!_currentWorksheetName) return;
+  var lib = _readLibrary();
+  if (lib.items[_currentWorksheetName]) {
+    _baselineSnapshot = JSON.stringify(lib.items[_currentWorksheetName].data || {});
+  }
+}
+
+function openCustomersDialog() {
+  if (!_storageAvailable) {
+    alert('Customer management isn\'t available — browser storage is unavailable.');
+    return;
+  }
+  _editingCustomerKey = null;
+  _customerActionMode = null;
+  renderCustomersList();
+  _wireCustomersListHandler();
+  var modal = document.getElementById('customersModal');
+  if (modal) modal.classList.add('open');
+}
+
+function closeCustomersDialog() {
+  _editingCustomerKey = null;
+  _customerActionMode = null;
+  var modal = document.getElementById('customersModal');
+  if (modal) modal.classList.remove('open');
+}
+
+function renderCustomersList() {
+  var container = document.getElementById('customersList');
+  if (!container) return;
+  var list = _collectCustomersForManagement();
+  if (!list.length) {
+    container.innerHTML = '<div class="cust-empty">No customers found in saved worksheets yet. Save a worksheet with a customer name to start building this list.</div>';
+    return;
+  }
+  var html = '';
+  for (var i = 0; i < list.length; i++) {
+    var c = list[i];
+    var isEditing = (_editingCustomerKey === c.key);
+    var rowClass = 'cust-row' + (isEditing ? ' editing' : '');
+    var hiddenTag = c.excluded
+      ? ' <span style="font-size:11px;color:#999;font-weight:normal;letter-spacing:0;text-transform:none;font-family:Barlow,sans-serif;">(hidden from suggestions)</span>'
+      : '';
+    var nameMarkup = '<div class="cust-name">' + _escHtml(c.name) + hiddenTag + '</div>';
+    var addrLine = (c.addr1 || c.addr2)
+      ? _escHtml([c.addr1, c.addr2].filter(Boolean).join(' \u2022 '))
+      : '<span class="cust-blank">no address on file</span>';
+    var contactLine = (c.contact || c.contact_email)
+      ? _escHtml([c.contact, c.contact_email].filter(Boolean).join(' \u2022 '))
+      : '<span class="cust-blank">no contact on file</span>';
+    var countLine = 'Used in ' + c.worksheetCount + ' saved worksheet' + (c.worksheetCount === 1 ? '' : 's');
+    var actionsMarkup = '';
+    if (!isEditing) {
+      var keyAttr = _escAttr(c.key);
+      actionsMarkup =
+        '<div class="cust-actions">' +
+          '<button class="btn btn-blue" data-cust-action="edit"  data-cust-key="' + keyAttr + '">Edit</button>' +
+          '<button class="btn btn-blue" data-cust-action="merge" data-cust-key="' + keyAttr + '">Merge</button>' +
+          (c.excluded
+            ? '<button class="btn btn-green" data-cust-action="restore" data-cust-key="' + keyAttr + '">Restore</button>'
+            : '<button class="btn btn-dark"  data-cust-action="delete"  data-cust-key="' + keyAttr + '">Delete</button>'
+          ) +
+        '</div>';
+    }
+    var formMarkup = '';
+    if (isEditing && _customerActionMode === 'edit') {
+      formMarkup = _renderCustomerEditForm(c);
+    } else if (isEditing && _customerActionMode === 'merge') {
+      formMarkup = _renderCustomerMergeForm(c, list);
+    } else if (isEditing && _customerActionMode === 'delete') {
+      formMarkup = _renderCustomerDeleteForm(c);
+    }
+    html += '<div class="' + rowClass + '" data-cust-key="' + _escAttr(c.key) + '">' +
+      '<div class="cust-row-head">' + nameMarkup + actionsMarkup + '</div>' +
+      '<div class="cust-meta">' + addrLine + '</div>' +
+      '<div class="cust-meta">' + contactLine + '</div>' +
+      '<div class="cust-count">' + countLine + '</div>' +
+      formMarkup +
+    '</div>';
+  }
+  container.innerHTML = html;
+  if (_editingCustomerKey && _customerActionMode === 'edit') {
+    setTimeout(function() {
+      var el = document.getElementById('cust_edit_name');
+      if (el) { el.focus(); el.select(); }
+    }, 0);
+  } else if (_editingCustomerKey && _customerActionMode === 'merge') {
+    setTimeout(function() {
+      var el = document.getElementById('cust_merge_target');
+      if (el) el.focus();
+    }, 0);
+  }
+}
+
+function _renderCustomerEditForm(c) {
+  var keyAttr = _escAttr(c.key);
+  return '<div class="cust-edit-form">' +
+    '<div class="modal-field"><label>Customer Name</label><input type="text" id="cust_edit_name" value="' + _escAttr(c.name) + '"></div>' +
+    '<div class="modal-field"><label>Address Line 1</label><input type="text" id="cust_edit_addr1" value="' + _escAttr(c.addr1) + '"></div>' +
+    '<div class="modal-field"><label>City / State / Zip</label><input type="text" id="cust_edit_addr2" value="' + _escAttr(c.addr2) + '"></div>' +
+    '<div class="modal-field"><label>Contact</label><input type="text" id="cust_edit_contact" value="' + _escAttr(c.contact) + '"></div>' +
+    '<div class="modal-field"><label>Contact Email</label><input type="email" id="cust_edit_contact_email" value="' + _escAttr(c.contact_email) + '"></div>' +
+    '<div class="cust-edit-foot">' +
+      '<button class="btn btn-blue"  data-cust-action="cancel">Cancel</button>' +
+      '<button class="btn btn-green" data-cust-action="save-edit" data-cust-key="' + keyAttr + '">Save Changes</button>' +
+    '</div>' +
+  '</div>';
+}
+
+function _renderCustomerMergeForm(c, list) {
+  var others = [];
+  for (var i = 0; i < list.length; i++) if (list[i].key !== c.key) others.push(list[i]);
+  if (!others.length) {
+    return '<div class="cust-merge-row"><span style="font-size:12px;color:#777;flex:1 1 100%;">No other customers available to merge into. Add another customer first, or use Edit to rename instead.</span>' +
+      '<button class="btn btn-blue" data-cust-action="cancel">Cancel</button></div>';
+  }
+  var opts = '<option value="">— pick a customer —</option>';
+  for (var j = 0; j < others.length; j++) {
+    opts += '<option value="' + _escAttr(others[j].key) + '">' + _escHtml(others[j].name) + '</option>';
+  }
+  var keyAttr = _escAttr(c.key);
+  return '<div class="cust-merge-row">' +
+    '<label for="cust_merge_target">Merge into:</label>' +
+    '<select id="cust_merge_target">' + opts + '</select>' +
+    '<button class="btn btn-blue"  data-cust-action="cancel">Cancel</button>' +
+    '<button class="btn btn-green" data-cust-action="save-merge" data-cust-key="' + keyAttr + '">Merge</button>' +
+  '</div>';
+}
+
+function _renderCustomerDeleteForm(c) {
+  var n = c.worksheetCount;
+  var keyAttr = _escAttr(c.key);
+  var labelText = n === 1
+    ? 'Also clear this customer\'s name and contact info from the 1 saved worksheet that uses it. (Without this, saved worksheets keep their data and you can Restore the customer later.)'
+    : 'Also clear this customer\'s name and contact info from all ' + n + ' saved worksheets that use it. (Without this, saved worksheets keep their data and you can Restore the customer later.)';
+  return '<div class="cust-delete-row">' +
+    '<div class="cust-del-msg">Remove "' + _escHtml(c.name) + '" from the customer suggestion dropdown?</div>' +
+    '<label><input type="checkbox" id="cust_del_clear_info"> ' + _escHtml(labelText) + '</label>' +
+    '<div class="cust-edit-foot">' +
+      '<button class="btn btn-blue" data-cust-action="cancel">Cancel</button>' +
+      '<button class="btn btn-dark" data-cust-action="confirm-delete" data-cust-key="' + keyAttr + '">Delete Customer</button>' +
+    '</div>' +
+  '</div>';
+}
+
+var _customersListHandlerWired = false;
+function _wireCustomersListHandler() {
+  if (_customersListHandlerWired) return;
+  var container = document.getElementById('customersList');
+  if (!container) return;
+  container.addEventListener('click', function(e) {
+    var btn = e.target;
+    while (btn && btn !== container && !(btn.getAttribute && btn.getAttribute('data-cust-action'))) {
+      btn = btn.parentNode;
+    }
+    if (!btn || btn === container) return;
+    var action = btn.getAttribute('data-cust-action');
+    var key    = btn.getAttribute('data-cust-key') || '';
+    switch (action) {
+      case 'edit':           startCustomerEdit(key);     break;
+      case 'merge':          startCustomerMerge(key);    break;
+      case 'delete':         startCustomerDelete(key);   break;
+      case 'restore':        restoreCustomer(key);       break;
+      case 'cancel':         cancelCustomerAction();     break;
+      case 'save-edit':      saveCustomerEdit(key);      break;
+      case 'save-merge':     saveCustomerMerge(key);     break;
+      case 'confirm-delete': confirmCustomerDelete(key); break;
+    }
+  });
+  _customersListHandlerWired = true;
+}
+
+function startCustomerEdit(key)   { _editingCustomerKey = key; _customerActionMode = 'edit';   renderCustomersList(); }
+function startCustomerMerge(key)  { _editingCustomerKey = key; _customerActionMode = 'merge';  renderCustomersList(); }
+function startCustomerDelete(key) { _editingCustomerKey = key; _customerActionMode = 'delete'; renderCustomersList(); }
+function cancelCustomerAction()   { _editingCustomerKey = null; _customerActionMode = null;   renderCustomersList(); }
+
+function saveCustomerEdit(key) {
+  var nameEl    = document.getElementById('cust_edit_name');
+  var addr1El   = document.getElementById('cust_edit_addr1');
+  var addr2El   = document.getElementById('cust_edit_addr2');
+  var contactEl = document.getElementById('cust_edit_contact');
+  var emailEl   = document.getElementById('cust_edit_contact_email');
+  var newName = (nameEl ? nameEl.value : '').trim();
+  if (!newName) { alert('Please enter a customer name.'); return; }
+  if (newName.length > 200) { alert('Name is too long (max 200 characters).'); return; }
+  var src = _findCustomerByKey(key);
+  if (!src) { alert('That customer no longer exists.'); cancelCustomerAction(); return; }
+  var info = {
+    name: newName,
+    addr1: (addr1El ? addr1El.value : '').trim(),
+    addr2: (addr2El ? addr2El.value : '').trim(),
+    contact: (contactEl ? contactEl.value : '').trim(),
+    contact_email: (emailEl ? emailEl.value : '').trim()
+  };
+  var newKey = newName.toLowerCase();
+  var mergingIntoExisting = false;
+  if (newKey !== key) {
+    var existing = _findCustomerByKey(newKey);
+    if (existing) {
+      if (!confirm('A customer named "' + existing.name + '" already exists. Saving will merge "' + src.name + '" into it and overwrite that customer\'s contact info with the values you entered. Continue?')) return;
+      mergingIntoExisting = true;
+    }
+  }
+  // Update the source customer's worksheets (renames + applies new info).
+  var changed = _updateCustomerInfoInLibrary(key, info);
+  // If merging into an existing customer, also overwrite the contact info on
+  // worksheets that already used the target name so they all end up identical.
+  if (mergingIntoExisting) {
+    changed += _updateCustomerInfoInLibrary(newKey, info);
+  }
+  var ex = _readCustomerExclusions();
+  var exChanged = false;
+  if (ex[key])    { delete ex[key];    exChanged = true; }
+  if (ex[newKey]) { delete ex[newKey]; exChanged = true; }
+  if (exChanged) _writeCustomerExclusions(ex);
+  _applyCustomerChangesToActiveForm(key, info, 'update');
+  if (mergingIntoExisting) {
+    _applyCustomerChangesToActiveForm(newKey, info, 'update');
+  }
+  _refreshBaselineIfLoaded();
+  saveForm();
+  refreshCustomerDatalist();
+  refreshWorksheetPicker();
+  refreshDirtyIndicator();
+  _editingCustomerKey = null;
+  _customerActionMode = null;
+  renderCustomersList();
+  flashActionMessage('Updated "' + newName + '" in ' + changed + ' worksheet' + (changed === 1 ? '' : 's'));
+}
+
+function saveCustomerMerge(srcKey) {
+  var sel = document.getElementById('cust_merge_target');
+  var targetKey = sel ? sel.value : '';
+  if (!targetKey) { alert('Pick a customer to merge into.'); return; }
+  var src = _findCustomerByKey(srcKey);
+  var tgt = _findCustomerByKey(targetKey);
+  if (!src || !tgt) { alert('That customer no longer exists.'); cancelCustomerAction(); return; }
+  if (!confirm('Merge "' + src.name + '" into "' + tgt.name + '"?\n\nAll ' + src.worksheetCount + ' worksheet' + (src.worksheetCount === 1 ? '' : 's') + ' that use "' + src.name + '" will be renamed to "' + tgt.name + '". The address and contact info on those worksheets is left untouched.')) return;
+  var changed = _renameCustomerInLibrary(srcKey, tgt.name);
+  var ex = _readCustomerExclusions();
+  if (ex[srcKey]) { delete ex[srcKey]; _writeCustomerExclusions(ex); }
+  _applyCustomerChangesToActiveForm(srcKey, { name: tgt.name }, 'rename');
+  _refreshBaselineIfLoaded();
+  saveForm();
+  refreshCustomerDatalist();
+  refreshWorksheetPicker();
+  refreshDirtyIndicator();
+  _editingCustomerKey = null;
+  _customerActionMode = null;
+  renderCustomersList();
+  flashActionMessage('Merged "' + src.name + '" into "' + tgt.name + '" (' + changed + ' worksheet' + (changed === 1 ? '' : 's') + ')');
+}
+
+function confirmCustomerDelete(key) {
+  var c = _findCustomerByKey(key);
+  if (!c) { cancelCustomerAction(); return; }
+  var alsoClear = !!(document.getElementById('cust_del_clear_info') || {}).checked;
+  var changed = 0;
+  if (alsoClear) {
+    changed = _clearCustomerFromLibrary(key, true);
+    var ex = _readCustomerExclusions();
+    if (ex[key]) { delete ex[key]; _writeCustomerExclusions(ex); }
+    _applyCustomerChangesToActiveForm(key, { alsoClearInfo: true }, 'clear');
+  } else {
+    var ex2 = _readCustomerExclusions();
+    ex2[key] = true;
+    _writeCustomerExclusions(ex2);
+  }
+  _refreshBaselineIfLoaded();
+  if (alsoClear) saveForm();
+  refreshCustomerDatalist();
+  refreshWorksheetPicker();
+  refreshDirtyIndicator();
+  _editingCustomerKey = null;
+  _customerActionMode = null;
+  renderCustomersList();
+  flashActionMessage(alsoClear
+    ? 'Cleared "' + c.name + '" from ' + changed + ' worksheet' + (changed === 1 ? '' : 's')
+    : 'Hid "' + c.name + '" from suggestions');
+}
+
+function restoreCustomer(key) {
+  var ex = _readCustomerExclusions();
+  if (ex[key]) { delete ex[key]; _writeCustomerExclusions(ex); }
+  refreshCustomerDatalist();
+  var c = _findCustomerByKey(key);
+  renderCustomersList();
+  flashActionMessage('Restored "' + (c ? c.name : key) + '" to suggestions');
+}
+
 function onPickerChange(sel) {
   var name = sel.value;
   if (!name) { refreshWorksheetPicker(); return; }
@@ -1496,6 +2143,7 @@ function saveCurrentWorksheet() {
   lib.items[_currentWorksheetName] = { data: data, savedAt: new Date().toISOString() };
   lib.current = _currentWorksheetName;
   if (!_writeLibrary(lib)) return;
+  _autoUnexcludeFromData(data);
   _baselineSnapshot = _snapshotString();
   refreshWorksheetPicker();
   refreshDirtyIndicator();
@@ -1518,6 +2166,7 @@ function saveWorksheetAs() {
   lib.items[name] = { data: data, savedAt: new Date().toISOString() };
   lib.current = name;
   if (!_writeLibrary(lib)) return;
+  _autoUnexcludeFromData(data);
   _currentWorksheetName = name;
   _baselineSnapshot = _snapshotString();
   refreshWorksheetPicker();
@@ -1596,9 +2245,11 @@ function duplicateCurrentWorksheet() {
   if (lib.items[name]) {
     if (!confirm('A worksheet named "' + name + '" already exists. Overwrite it?')) return;
   }
-  lib.items[name] = { data: collectFormData(), savedAt: new Date().toISOString() };
+  var dupData = collectFormData();
+  lib.items[name] = { data: dupData, savedAt: new Date().toISOString() };
   lib.current = name;
   if (!_writeLibrary(lib)) return;
+  _autoUnexcludeFromData(dupData);
   _currentWorksheetName = name;
   _baselineSnapshot = _snapshotString();
   saveForm();

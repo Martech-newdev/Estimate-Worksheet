@@ -19,6 +19,20 @@ Single-page tool for creating professional job estimates with:
   worksheet for that customer. Existing non-blank fields are never
   overwritten. Defaults dialog Customer continues to pre-fill new
   worksheets independently.
+- A "Customers..." dialog (next to "Defaults..." on both tabs) for managing
+  the suggestion list directly: each customer row shows its current name,
+  address, contact, and how many saved worksheets reference it. Each row
+  supports Edit (rename + update the four contact fields across every
+  matching saved worksheet, with merge confirmation when renaming into an
+  existing customer), Merge (renames the customer to a chosen target across
+  every matching saved worksheet, leaving each worksheet's address/contact
+  untouched), and Delete (hides the customer from the suggestion dropdown
+  via an exclusions list, with an optional checkbox to also wipe the name
+  and contact info from every saved worksheet that uses it). Hidden
+  customers stay visible in the dialog with a Restore button. Saving a
+  worksheet whose Customer field matches an excluded name automatically
+  un-excludes it. All edits update the dropdown and the active form
+  immediately without a reload.
 
 ## Storage
 
@@ -50,6 +64,13 @@ Single-page tool for creating professional job estimates with:
   each time a worksheet is pre-filled with a templated job number. The
   next value is shown and editable in the Defaults dialog; cleared to 1
   by Clear Defaults.
+- `localStorage["martech_customer_exclusions_v1"]` — JSON array of
+  lowercase customer names hidden from the Customer suggestion dropdown
+  via the Customers dialog's Delete action. The Customers dialog still
+  shows hidden entries (with a Restore button) as long as a saved
+  worksheet still references them. Saving a worksheet whose Customer
+  field matches an excluded name removes that name from the exclusion
+  list automatically.
 
 ## Tech Stack
 
