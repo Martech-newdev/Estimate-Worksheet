@@ -89,7 +89,14 @@ Storage is split into two layers:
   pre-filled with a templated job number.
 - `imported_customers` — JSON array of customers seeded via the
   Customers dialog's "Import Customers..." action:
-  `[{ name, addr1, addr2, contact, contact_email, importedAt }, ...]`.
+  `[{ name, addr1, addr2, contact, contact_email, customer_number,
+       service_site, customer_name, importedAt }, ...]`.
+  Each entry is keyed by lowercase `name`, which holds the **Site
+  Description** when importing the multi-site customer-list CSV (one row
+  per service site). The optional reference fields (`customer_number`,
+  `service_site`, `customer_name` — the parent company) are surfaced in
+  the Customers dialog and are searchable from the filter, but only the
+  `name` field flows into the worksheet's Customer input.
 - `customer_exclusions` — JSON array of lowercase customer names hidden
   from the Customer suggestion dropdown.
 

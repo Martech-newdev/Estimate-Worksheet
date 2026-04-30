@@ -303,6 +303,16 @@
     font-size: 12px; color: #444; line-height: 1.4;
   }
   .cust-meta .cust-blank { color: #999; font-style: italic; }
+  /* Reference IDs (Customer #, Service Site #, Parent name) — show in a
+     muted, slightly-tabular style so the eye separates them from the
+     address/contact rows below. */
+  .cust-meta-ref {
+    color: #1a5276; font-weight: 600;
+    font-family: 'Barlow Condensed', sans-serif;
+    letter-spacing: 0.4px; font-size: 11px;
+    text-transform: uppercase;
+    margin-top: 6px;
+  }
   .cust-count {
     margin-top: 4px;
     font-size: 11px; color: #777;
@@ -1735,6 +1745,13 @@ function _readImportedCustomers() {
       addr2: (c.addr2 || '').trim(),
       contact: (c.contact || '').trim(),
       contact_email: (c.contact_email || '').trim(),
+      // New optional reference columns from the customer-list CSV. Each row
+      // there represents a unique service site, so the worksheet "Customer"
+      // field carries the Site Description (held in `name`) and these extras
+      // are surfaced in the Customers dialog for cross-reference.
+      customer_number: String(c.customer_number || '').trim(),
+      service_site:    String(c.service_site    || '').trim(),
+      customer_name:   String(c.customer_name   || '').trim(),
       importedAt: c.importedAt || ''
     };
   }
@@ -1753,6 +1770,9 @@ function _writeImportedCustomers(map) {
       addr2: c.addr2 || '',
       contact: c.contact || '',
       contact_email: c.contact_email || '',
+      customer_number: c.customer_number || '',
+      service_site:    c.service_site    || '',
+      customer_name:   c.customer_name   || '',
       importedAt: c.importedAt || new Date().toISOString()
     });
   }
@@ -1806,12 +1826,18 @@ function _mergeSuggestionCandidate(byKey, key, cand) {
     if (!cand.addr2 && prev.addr2) cand.addr2 = prev.addr2;
     if (!cand.contact && prev.contact) cand.contact = prev.contact;
     if (!cand.contact_email && prev.contact_email) cand.contact_email = prev.contact_email;
+    if (!cand.customer_number && prev.customer_number) cand.customer_number = prev.customer_number;
+    if (!cand.service_site    && prev.service_site)    cand.service_site    = prev.service_site;
+    if (!cand.customer_name   && prev.customer_name)   cand.customer_name   = prev.customer_name;
     byKey[key] = cand;
   } else {
     if (!prev.addr1 && cand.addr1) prev.addr1 = cand.addr1;
     if (!prev.addr2 && cand.addr2) prev.addr2 = cand.addr2;
     if (!prev.contact && cand.contact) prev.contact = cand.contact;
     if (!prev.contact_email && cand.contact_email) prev.contact_email = cand.contact_email;
+    if (!prev.customer_number && cand.customer_number) prev.customer_number = cand.customer_number;
+    if (!prev.service_site    && cand.service_site)    prev.service_site    = cand.service_site;
+    if (!prev.customer_name   && cand.customer_name)   prev.customer_name   = cand.customer_name;
   }
 }
 
@@ -1849,6 +1875,9 @@ function _collectCustomerSuggestions() {
       name: ic.name,
       addr1: ic.addr1, addr2: ic.addr2,
       contact: ic.contact, contact_email: ic.contact_email,
+      customer_number: ic.customer_number || '',
+      service_site:    ic.service_site    || '',
+      customer_name:   ic.customer_name   || '',
       savedAt: _importedAtMs(ic)
     });
   }
@@ -1928,6 +1957,9 @@ function _mergeManagementCandidate(byKey, key, cand, excluded, opts) {
       name: cand.name,
       addr1: cand.addr1, addr2: cand.addr2,
       contact: cand.contact, contact_email: cand.contact_email,
+      customer_number: cand.customer_number || '',
+      service_site:    cand.service_site    || '',
+      customer_name:   cand.customer_name   || '',
       savedAt: cand.savedAt,
       excluded: !!excluded[key],
       imported: !!(opts && opts.imported),
@@ -1947,6 +1979,11 @@ function _mergeManagementCandidate(byKey, key, cand, excluded, opts) {
       if (!prev.contact && cand.contact) prev.contact = cand.contact;
       if (!prev.contact_email && cand.contact_email) prev.contact_email = cand.contact_email;
     }
+    // Reference fields are only ever set from the imported store, so newer
+    // wins but we never blank out an existing value with a missing one.
+    if (cand.customer_number) prev.customer_number = cand.customer_number;
+    if (cand.service_site)    prev.service_site    = cand.service_site;
+    if (cand.customer_name)   prev.customer_name   = cand.customer_name;
     if (opts && opts.imported) prev.imported = true;
   }
   return byKey[key];
@@ -1997,6 +2034,9 @@ function _collectCustomersForManagement() {
       name: ic.name,
       addr1: ic.addr1, addr2: ic.addr2,
       contact: ic.contact, contact_email: ic.contact_email,
+      customer_number: ic.customer_number || '',
+      service_site:    ic.service_site    || '',
+      customer_name:   ic.customer_name   || '',
       savedAt: _importedAtMs(ic)
     }, excluded, { imported: true });
   }
@@ -2100,6 +2140,11 @@ function _renameImportedCustomer(oldKey, info) {
   var hadOld = !!imp[oldKey];
   var hadNew = (newKey !== oldKey) && !!imp[newKey];
   if (!hadOld && !hadNew) return false;
+  // Preserve any reference fields (Customer #, Service Site, parent name)
+  // already on file. The edit form lets the user override them; otherwise
+  // we keep the old values rather than blanking them with whatever info{}
+  // the caller passed in.
+  var prevRef = imp[oldKey] || imp[newKey] || {};
   if (hadOld && newKey !== oldKey) delete imp[oldKey];
   imp[newKey] = {
     name: info.name,
@@ -2107,6 +2152,9 @@ function _renameImportedCustomer(oldKey, info) {
     addr2: info.addr2 || '',
     contact: info.contact || '',
     contact_email: info.contact_email || '',
+    customer_number: (info.customer_number != null ? info.customer_number : prevRef.customer_number) || '',
+    service_site:    (info.service_site    != null ? info.service_site    : prevRef.service_site)    || '',
+    customer_name:   (info.customer_name   != null ? info.customer_name   : prevRef.customer_name)   || '',
     importedAt: new Date().toISOString()
   };
   return _writeImportedCustomers(imp);
@@ -2234,6 +2282,18 @@ function renderCustomersList() {
       ? ' <span style="font-size:11px;color:#999;font-weight:normal;letter-spacing:0;text-transform:none;font-family:Barlow,sans-serif;">(hidden from suggestions)</span>'
       : '';
     var nameMarkup = '<div class="cust-name">' + _escHtml(c.name) + hiddenTag + '</div>';
+    // Reference line (Customer #, Service Site, parent Customer Name) is
+    // only shown when at least one of those values is present, so older
+    // entries that only have a name don't get an empty placeholder line.
+    var refBits = [];
+    if (c.customer_number) refBits.push('Customer #' + c.customer_number);
+    if (c.service_site)    refBits.push('Service Site #' + c.service_site);
+    if (c.customer_name && c.customer_name.toLowerCase() !== c.name.toLowerCase()) {
+      refBits.push('Parent: ' + c.customer_name);
+    }
+    var refLine = refBits.length
+      ? '<div class="cust-meta cust-meta-ref">' + _escHtml(refBits.join(' \u2022 ')) + '</div>'
+      : '';
     var addrLine = (c.addr1 || c.addr2)
       ? _escHtml([c.addr1, c.addr2].filter(Boolean).join(' \u2022 '))
       : '<span class="cust-blank">no address on file</span>';
@@ -2275,6 +2335,7 @@ function renderCustomersList() {
     }
     html += '<div class="' + rowClass + '" data-cust-key="' + _escAttr(c.key) + '">' +
       '<div class="cust-row-head">' + nameMarkup + actionsMarkup + '</div>' +
+      refLine +
       '<div class="cust-meta">' + addrLine + '</div>' +
       '<div class="cust-meta">' + contactLine + '</div>' +
       '<div class="cust-count">' + countLine + '</div>' +
@@ -2308,6 +2369,11 @@ function _filterCustomersForList(list, filterText) {
 function _customerMatchesFilter(c, filterText) {
   if (!filterText) return true;
   if ((c.name || '').toLowerCase().indexOf(filterText) !== -1) return true;
+  // Match the imported reference fields too — the user often searches by
+  // Customer # or Service Site # that they pulled off a paper work order.
+  if (c.customer_number && String(c.customer_number).toLowerCase().indexOf(filterText) !== -1) return true;
+  if (c.service_site    && String(c.service_site).toLowerCase().indexOf(filterText)    !== -1) return true;
+  if (c.customer_name   && c.customer_name.toLowerCase().indexOf(filterText)            !== -1) return true;
   var ws = c.worksheetList || [];
   for (var i = 0; i < ws.length; i++) {
     var w = ws[i];
@@ -2401,7 +2467,10 @@ function _renderCustomerJobsList(c) {
 function _renderCustomerEditForm(c) {
   var keyAttr = _escAttr(c.key);
   return '<div class="cust-edit-form">' +
-    '<div class="modal-field"><label>Customer Name</label><input type="text" id="cust_edit_name" value="' + _escAttr(c.name) + '"></div>' +
+    '<div class="modal-field"><label>Customer Name (Site Description)</label><input type="text" id="cust_edit_name" value="' + _escAttr(c.name) + '"></div>' +
+    '<div class="modal-field"><label>Customer #</label><input type="text" id="cust_edit_customer_number" value="' + _escAttr(c.customer_number || '') + '"></div>' +
+    '<div class="modal-field"><label>Service Site #</label><input type="text" id="cust_edit_service_site" value="' + _escAttr(c.service_site || '') + '"></div>' +
+    '<div class="modal-field"><label>Parent Customer Name</label><input type="text" id="cust_edit_customer_name" value="' + _escAttr(c.customer_name || '') + '"></div>' +
     '<div class="modal-field"><label>Address Line 1</label><input type="text" id="cust_edit_addr1" value="' + _escAttr(c.addr1) + '"></div>' +
     '<div class="modal-field"><label>City / State / Zip</label><input type="text" id="cust_edit_addr2" value="' + _escAttr(c.addr2) + '"></div>' +
     '<div class="modal-field"><label>Contact</label><input type="text" id="cust_edit_contact" value="' + _escAttr(c.contact) + '"></div>' +
@@ -2523,6 +2592,9 @@ function saveCustomerEdit(key) {
   var addr2El   = document.getElementById('cust_edit_addr2');
   var contactEl = document.getElementById('cust_edit_contact');
   var emailEl   = document.getElementById('cust_edit_contact_email');
+  var custNumEl = document.getElementById('cust_edit_customer_number');
+  var siteEl    = document.getElementById('cust_edit_service_site');
+  var parentEl  = document.getElementById('cust_edit_customer_name');
   var newName = (nameEl ? nameEl.value : '').trim();
   if (!newName) { alert('Please enter a customer name.'); return; }
   if (newName.length > 200) { alert('Name is too long (max 200 characters).'); return; }
@@ -2533,7 +2605,10 @@ function saveCustomerEdit(key) {
     addr1: (addr1El ? addr1El.value : '').trim(),
     addr2: (addr2El ? addr2El.value : '').trim(),
     contact: (contactEl ? contactEl.value : '').trim(),
-    contact_email: (emailEl ? emailEl.value : '').trim()
+    contact_email: (emailEl ? emailEl.value : '').trim(),
+    customer_number: (custNumEl ? custNumEl.value : '').trim(),
+    service_site:    (siteEl    ? siteEl.value    : '').trim(),
+    customer_name:   (parentEl  ? parentEl.value  : '').trim()
   };
   var newKey = newName.toLowerCase();
   var mergingIntoExisting = false;
@@ -2582,6 +2657,37 @@ function saveCustomerMerge(srcKey) {
   if (!src || !tgt) { alert('That customer no longer exists.'); cancelCustomerAction(); return; }
   if (!confirm('Merge "' + src.name + '" into "' + tgt.name + '"?\n\nAll ' + src.worksheetCount + ' worksheet' + (src.worksheetCount === 1 ? '' : 's') + ' that use "' + src.name + '" will be renamed to "' + tgt.name + '". The address and contact info on those worksheets is left untouched.')) return;
   var changed = _renameCustomerInLibrary(srcKey, tgt.name);
+  // Carry forward any reference fields (Customer #, Service Site, Parent
+  // Customer Name) from the source onto the target before dropping the
+  // source's imported entry, so a merge never silently throws away the
+  // CSV-derived metadata. Existing non-blank target values win.
+  var imp = _readImportedCustomers();
+  var tgtImp = imp[targetKey];
+  if (tgtImp || src.customer_number || src.service_site || src.customer_name) {
+    var base = tgtImp || {
+      name: tgt.name,
+      addr1: tgt.addr1 || '',
+      addr2: tgt.addr2 || '',
+      contact: tgt.contact || '',
+      contact_email: tgt.contact_email || '',
+      customer_number: '',
+      service_site: '',
+      customer_name: '',
+      importedAt: ''
+    };
+    var refsChanged =
+      (!base.customer_number && src.customer_number) ||
+      (!base.service_site    && src.service_site)    ||
+      (!base.customer_name   && src.customer_name);
+    if (refsChanged || !tgtImp) {
+      base.customer_number = base.customer_number || src.customer_number || '';
+      base.service_site    = base.service_site    || src.service_site    || '';
+      base.customer_name   = base.customer_name   || src.customer_name   || '';
+      if (!base.importedAt) base.importedAt = new Date().toISOString();
+      imp[targetKey] = base;
+      _writeImportedCustomers(imp);
+    }
+  }
   // Source customer is gone after the merge — drop its imported-store entry too
   // so it doesn't reappear in the dropdown under the old name.
   _removeImportedCustomer(srcKey);
@@ -2650,17 +2756,28 @@ function restoreCustomer(key) {
 }
 
 // ── Customer import dialog ────────────────────────────────────────────────────
+// The bare header word "customer" is intentionally NOT in any alias list — it
+// is disambiguated separately in _detectImportColumns because the customer-list
+// CSV uses "Customer" to mean the customer NUMBER while older single-line
+// imports use it to mean the customer's name.
 var IMPORT_HEADER_ALIASES = {
-  name:          ['name', 'customer', 'customer name', 'company', 'company name'],
-  addr1:         ['address', 'address line 1', 'address1', 'addr1', 'address 1', 'street', 'street address'],
-  addr2:         ['city/state/zip', 'csz', 'city state zip', 'city, state, zip', 'address line 2', 'address2', 'addr2', 'address 2'],
-  contact:       ['contact', 'contact name', 'attn', 'attention'],
-  contact_email: ['email', 'contact email', 'e-mail', 'email address', 'contact e-mail']
+  name:            ['name', 'site description', 'site desc', 'company', 'company name'],
+  addr1:           ['address', 'address line 1', 'address1', 'addr1', 'address 1', 'street', 'street address'],
+  addr2:           ['city/state/zip', 'csz', 'city state zip', 'city, state, zip', 'address line 2', 'address2', 'addr2', 'address 2'],
+  city:            ['city', 'town'],
+  state:           ['state', 'st', 'province'],
+  zip:             ['zip', 'zip code', 'zipcode', 'postal code', 'postcode', 'postal'],
+  contact:         ['contact', 'contact name', 'attn', 'attention'],
+  contact_email:   ['email', 'contact email', 'e-mail', 'email address', 'contact e-mail'],
+  customer_number: ['customer #', 'customer no', 'customer no.', 'customer number', 'cust #', 'cust no', 'customer id', 'cust id'],
+  service_site:    ['service site', 'service site #', 'service site number', 'site #', 'site number', 'site id'],
+  customer_name:   ['customer name', 'parent customer', 'parent', 'parent name']
 };
 
 function _isImportHeaderCell(cell) {
   var h = String(cell || '').trim().toLowerCase();
   if (!h) return false;
+  if (h === 'customer') return true;
   for (var k in IMPORT_HEADER_ALIASES) {
     if (!Object.prototype.hasOwnProperty.call(IMPORT_HEADER_ALIASES, k)) continue;
     var arr = IMPORT_HEADER_ALIASES[k];
@@ -2670,19 +2787,46 @@ function _isImportHeaderCell(cell) {
 }
 
 function _detectImportColumns(headerCells) {
-  var map = { name: -1, addr1: -1, addr2: -1, contact: -1, contact_email: -1 };
+  var map = {
+    name: -1, addr1: -1, addr2: -1, city: -1, state: -1, zip: -1,
+    contact: -1, contact_email: -1,
+    customer_number: -1, service_site: -1, customer_name: -1
+  };
+  var raw = [];
   for (var i = 0; i < headerCells.length; i++) {
-    var h = String(headerCells[i] || '').trim().toLowerCase();
-    if (!h) continue;
+    raw[i] = String(headerCells[i] || '').trim().toLowerCase();
+  }
+  // First pass: assign every header that can be matched without ambiguity.
+  // Skip the bare word "customer" — it's resolved in the second pass.
+  for (var i2 = 0; i2 < raw.length; i2++) {
+    var h = raw[i2];
+    if (!h || h === 'customer') continue;
     for (var k in IMPORT_HEADER_ALIASES) {
       if (!Object.prototype.hasOwnProperty.call(IMPORT_HEADER_ALIASES, k)) continue;
       if (map[k] !== -1) continue;
       var arr = IMPORT_HEADER_ALIASES[k];
       for (var j = 0; j < arr.length; j++) {
-        if (arr[j] === h) { map[k] = i; break; }
+        if (arr[j] === h) { map[k] = i2; break; }
       }
     }
   }
+  // Disambiguate the bare word "customer". If the sheet also has "site
+  // description" or "customer name", then "customer" is the customer NUMBER.
+  // Otherwise it's the customer's display name (legacy single-line format).
+  var hasNameElsewhere = (map.name !== -1) || (map.customer_name !== -1);
+  for (var i3 = 0; i3 < raw.length; i3++) {
+    if (raw[i3] !== 'customer') continue;
+    if (hasNameElsewhere) {
+      if (map.customer_number === -1) map.customer_number = i3;
+    } else {
+      if (map.name === -1) map.name = i3;
+    }
+  }
+  // If we have a parent customer name but no per-row name and no site
+  // description, fall back to the parent name as the row's display name so
+  // the import still produces usable entries (rather than every row being
+  // skipped for "no name").
+  if (map.name === -1 && map.customer_name !== -1) map.name = map.customer_name;
   return map;
 }
 
@@ -2718,6 +2862,9 @@ function _parseDelimitedText(text, delim) {
 function _parseCustomerImport(text) {
   var result = { rows: [], warnings: [], delim: 'comma', hasHeader: false, totalLines: 0 };
   if (!text || !text.trim()) return result;
+  // Strip a UTF-8 BOM at the very start of the file so it doesn't end up
+  // inside the first header cell (where it would break alias matching).
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
   // Auto-detect delimiter: tab if any tab outside comments, else comma.
   var hasTab = false;
   var lines = text.split(/\r?\n/);
@@ -2776,6 +2923,13 @@ function _parseCustomerImport(text) {
     if (idx < 0 || idx >= cells.length) return '';
     return (cells[idx] || '').trim();
   }
+  function combineCsz(city, state, zip) {
+    // "City, ST 95240" — drop blanks gracefully so we don't end up with
+    // ", CA 95240" or "Lodi,  " when one column is missing.
+    var right = [state, zip].filter(Boolean).join(' ');
+    return [city, right].filter(Boolean).join(', ');
+  }
+  var hasCsz = (colMap.city !== -1 || colMap.state !== -1 || colMap.zip !== -1);
   for (var r = startIdx; r < rows.length; r++) {
     var cells = rows[r];
     // Skip empty rows
@@ -2783,12 +2937,23 @@ function _parseCustomerImport(text) {
     for (var ci = 0; ci < cells.length; ci++) if ((cells[ci] || '').trim()) { anyNonEmpty = true; break; }
     if (!anyNonEmpty) continue;
     var name = pick(cells, colMap.name);
+    var addr2 = pick(cells, colMap.addr2);
+    if (!addr2 && hasCsz) {
+      addr2 = combineCsz(
+        pick(cells, colMap.city),
+        pick(cells, colMap.state),
+        pick(cells, colMap.zip)
+      );
+    }
     var entry = {
       name: name,
       addr1: pick(cells, colMap.addr1),
-      addr2: pick(cells, colMap.addr2),
+      addr2: addr2,
       contact: pick(cells, colMap.contact),
       contact_email: pick(cells, colMap.contact_email),
+      customer_number: pick(cells, colMap.customer_number),
+      service_site:    pick(cells, colMap.service_site),
+      customer_name:   pick(cells, colMap.customer_name),
       lineNum: r + 1
     };
     if (!name) {
@@ -2867,6 +3032,8 @@ function _renderImportPreview(parsed) {
                 : row.action === 'merge' ? 'Merge'
                 : 'Skip';
     var titleParts = [];
+    if (row.customer_number) titleParts.push('Cust #' + row.customer_number);
+    if (row.service_site)    titleParts.push('Site #' + row.service_site);
     if (row.addr1) titleParts.push(row.addr1);
     if (row.addr2) titleParts.push(row.addr2);
     if (row.contact) titleParts.push(row.contact);
@@ -2986,7 +3153,10 @@ function runCustomerImport() {
       addr1: existingCust ? existingCust.addr1 : '',
       addr2: existingCust ? existingCust.addr2 : '',
       contact: existingCust ? existingCust.contact : '',
-      contact_email: existingCust ? existingCust.contact_email : ''
+      contact_email: existingCust ? existingCust.contact_email : '',
+      customer_number: (existingCust && existingCust.customer_number) || '',
+      service_site:    (existingCust && existingCust.service_site)    || '',
+      customer_name:   (existingCust && existingCust.customer_name)   || ''
     };
     var next = {
       name: base.name || row.name,
@@ -2994,6 +3164,12 @@ function runCustomerImport() {
       addr2: base.addr2 || row.addr2 || '',
       contact: base.contact || row.contact || '',
       contact_email: base.contact_email || row.contact_email || '',
+      // Reference fields from the customer-list CSV. Re-importing a row will
+      // refresh these (the CSV is the system of record for them); blanks in
+      // the new row never wipe out a value we already have on file.
+      customer_number: row.customer_number || base.customer_number || '',
+      service_site:    row.service_site    || base.service_site    || '',
+      customer_name:   row.customer_name   || base.customer_name   || '',
       importedAt: nowIso
     };
     imp[key] = next;
