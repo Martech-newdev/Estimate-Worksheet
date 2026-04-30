@@ -51,15 +51,30 @@ Single-page tool for creating professional job estimates with:
 - An "Import Customers..." action inside the Customers dialog seeds the
   dropdown from a pasted list or a small CSV/TSV file. Expected columns
   (in order, or via a header row) are Name, Address Line 1,
-  City/State/Zip, Contact, Contact Email. Tab vs. comma is auto-detected,
-  quoted fields are supported, and lines starting with `#` are skipped.
-  A live preview tags each row as New, Merge (case-insensitive name match
-  with an existing customer fills only blank fields, never overwrites),
-  or Skip (rows missing a name). Imported customers persist in their own
-  localStorage key and the dropdown picks them up immediately. Edit /
-  Merge / Delete on an imported customer keep the imported store in sync
-  (rename re-keys the imported entry; merge drops the source imported
-  entry; delete with the "also clear" checkbox permanently removes it).
+  City/State/Zip, Contact, Contact Email. Header-row imports also accept
+  the user's real multi-site layout: Service Site, Customer (= number),
+  Customer Name (parent), Site Description (= dropdown name), Address,
+  City, State, Zip Code. Tab vs. comma is auto-detected, quoted fields
+  are supported, and lines starting with `#` are skipped. A live preview
+  tags each row as New, Merge (case-insensitive name match with an
+  existing customer fills only blank fields, never overwrites), or Skip
+  (rows missing a name). Imported customers persist in their own shared
+  store and the dropdown picks them up immediately. Edit / Merge / Delete
+  on an imported customer keep the imported store in sync (rename re-keys
+  the imported entry; merge drops the source imported entry and carries
+  its reference fields onto the target; delete with the "also clear"
+  checkbox permanently removes it).
+- An "Export Customers..." action in the same dialog downloads every
+  imported customer as a UTF-8 CSV in the multi-site header layout
+  (Customer, Customer Name, Service Site, Site Description, Address,
+  City, State, Zip Code, Contact, Contact Email). The combined `addr2`
+  is split back into City/State/Zip on US-style values; non-matching
+  values fall back into the City column so re-import recombines them
+  losslessly. Cells that begin with `=`, `+`, `-`, `@`, tab, or CR are
+  prefixed with a single quote on export to neutralize spreadsheet
+  formula injection. The file is named `customers_export_<ISO>.csv`
+  and is intended both for opening in Excel/Sheets and for re-importing
+  into another Replit project running this app.
 
 ## Storage
 
