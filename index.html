@@ -514,6 +514,66 @@
 </head>
 <body>
 
+<!-- ============================================================
+     Field-Scheduler bridge UI (Q3b). Hidden by default — only
+     materializes when /api/config reports bridge_enabled=true.
+     Styles inline so the head CSS stays untouched.
+     ============================================================ -->
+<div id="fsBridge" style="display:none;background:#f4f6f8;border-bottom:1px solid #d0d7de;padding:6px 16px;font-size:12px;font-family:'Barlow Condensed',sans-serif;">
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <strong style="color:#444;text-transform:uppercase;letter-spacing:0.04em;">Field-Scheduler</strong>
+    <span id="fsBridgeStatus" style="color:#6b7280;">Not signed in</span>
+    <span id="fsBridgeQuoteInfo" style="color:#0a7d32;font-weight:600;"></span>
+    <div style="margin-left:auto;display:flex;gap:6px;">
+      <button id="fsBridgeSignInBtn"   class="btn btn-blue" onclick="window.fsBridge.openSignIn()" style="display:none;">Sign in</button>
+      <button id="fsBridgeSubmitBtn"   class="btn btn-blue" onclick="window.fsBridge.openSubmit()" style="display:none;">Submit to Field-Scheduler</button>
+      <button id="fsBridgeSignOutBtn"  class="btn btn-blue" onclick="window.fsBridge.signOut()"    style="display:none;">Sign out</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sign-in modal (uses the same modal-overlay class as Defaults/Customers) -->
+<div class="modal-overlay" id="fsBridgeSignInModal" role="dialog" aria-modal="true" aria-labelledby="fsBridgeSignInTitle">
+  <div class="modal" style="max-width:380px;">
+    <div class="modal-head" id="fsBridgeSignInTitle">Sign in to Field-Scheduler</div>
+    <div class="modal-body" style="padding:14px 16px;">
+      <div id="fsBridgeSignInErr" style="display:none;background:#fde7e9;border:1px solid #f5c6cb;color:#842029;padding:6px 8px;border-radius:4px;margin-bottom:8px;font-size:12px;"></div>
+      <label style="display:block;margin-bottom:8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#555;">Username
+        <input id="fsBridgeUser" type="text" autocomplete="username" style="display:block;width:100%;margin-top:3px;padding:6px 8px;border:1px solid #ccc;border-radius:3px;">
+      </label>
+      <label style="display:block;margin-bottom:8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#555;">Password
+        <input id="fsBridgePass" type="password" autocomplete="current-password" style="display:block;width:100%;margin-top:3px;padding:6px 8px;border:1px solid #ccc;border-radius:3px;">
+      </label>
+      <p style="font-size:11px;color:#6b7280;margin:8px 0 0;">Same credentials as the Field-Scheduler app. Your token lives in this browser only.</p>
+    </div>
+    <div class="modal-foot" style="padding:8px 16px 12px;display:flex;justify-content:flex-end;gap:6px;">
+      <button class="btn btn-blue" onclick="window.fsBridge.closeSignIn()">Cancel</button>
+      <button class="btn btn-blue" onclick="window.fsBridge.submitSignIn()" id="fsBridgeSignInGo">Sign in</button>
+    </div>
+  </div>
+</div>
+
+<!-- Submit-to-Field-Scheduler modal -->
+<div class="modal-overlay" id="fsBridgeSubmitModal" role="dialog" aria-modal="true" aria-labelledby="fsBridgeSubmitTitle">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-head" id="fsBridgeSubmitTitle">Submit worksheet to Field-Scheduler</div>
+    <div class="modal-body" style="padding:14px 16px;">
+      <div id="fsBridgeSubmitErr" style="display:none;background:#fde7e9;border:1px solid #f5c6cb;color:#842029;padding:6px 8px;border-radius:4px;margin-bottom:10px;font-size:12px;"></div>
+      <label style="display:block;margin-bottom:10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#555;">Customer (Field-Scheduler)
+        <select id="fsBridgeCustomer" style="display:block;width:100%;margin-top:3px;padding:6px 8px;border:1px solid #ccc;border-radius:3px;">
+          <option value="">— Select —</option>
+        </select>
+      </label>
+      <div id="fsBridgeSummary" style="background:#f7f9fb;border:1px solid #e1e5ea;border-radius:4px;padding:8px 10px;font-size:12px;color:#374151;"></div>
+      <p style="font-size:11px;color:#6b7280;margin:8px 0 0;">A new draft quote will be created in Field-Scheduler. You can edit it back here any time before it's accepted.</p>
+    </div>
+    <div class="modal-foot" style="padding:8px 16px 12px;display:flex;justify-content:flex-end;gap:6px;">
+      <button class="btn btn-blue" onclick="window.fsBridge.closeSubmit()">Cancel</button>
+      <button class="btn btn-blue" onclick="window.fsBridge.confirmSubmit()" id="fsBridgeSubmitGo">Submit</button>
+    </div>
+  </div>
+</div>
+
 <datalist id="cust_datalist"></datalist>
 
 <div class="controls">
@@ -3919,5 +3979,336 @@ function generateQuote() {
     });
 }
 </script>
+
+<!-- ============================================================
+     Field-Scheduler bridge (Q3b). Self-contained IIFE so a syntax
+     error here can't break the worksheet's existing code. Exposes
+     a small `window.fsBridge` API for the inline onclick handlers
+     in the HTML above.
+     ============================================================ -->
+<script>
+(function fsBridge() {
+  var FS = null;             // base URL, fetched from /api/config; null = disabled
+  var token = null;          // JWT in localStorage["fs_jwt"]
+  var me = null;             // { id, username, role, displayName, permissions[] }
+  var customers = [];        // cache from FS /api/customers
+  var loadedQuote = null;    // { id, number, status, customer, items[], … } when ?quoteId=
+  var TOKEN_KEY = "fs_jwt";
+
+  // -------- DOM helpers --------
+  function $(id) { return document.getElementById(id); }
+  function show(id, on) { var el = $(id); if (el) el.style.display = on ? "" : "none"; }
+  function setText(id, t) { var el = $(id); if (el) el.textContent = t; }
+  function setErr(id, msg) {
+    var el = $(id);
+    if (!el) return;
+    if (msg) { el.textContent = msg; el.style.display = "block"; }
+    else     { el.textContent = "";  el.style.display = "none"; }
+  }
+  function openModal(id) { var el = $(id); if (el) el.classList.add("modal-active"); }
+  function closeModal(id) { var el = $(id); if (el) el.classList.remove("modal-active"); }
+
+  // -------- Active-page detection (matches the worksheet's switchTab semantics) --------
+  function activePrefix() {
+    var t1 = $("tab1"), t2 = $("tab2");
+    if (t2 && t2.style.display !== "none") return "b";
+    if (t1 && t1.style.display !== "none") return "a";
+    return "a";
+  }
+  function freeRowsFor(p) { return p === "b" ? 63 : 18; }
+
+  // -------- Money helpers --------
+  function n(v) {
+    if (v == null || v === "") return 0;
+    var x = Number(v);
+    return Number.isFinite(x) ? x : 0;
+  }
+  function fmt$(v) {
+    return Number(v).toLocaleString(undefined, { style: "currency", currency: "USD" });
+  }
+
+  // -------- Render banner --------
+  function render() {
+    if (!FS) { show("fsBridge", false); return; }
+    show("fsBridge", true);
+    var signedIn = !!me;
+    show("fsBridgeSignInBtn",  !signedIn);
+    show("fsBridgeSubmitBtn",   signedIn);
+    show("fsBridgeSignOutBtn",  signedIn);
+    setText(
+      "fsBridgeStatus",
+      signedIn ? ("Signed in as " + (me.displayName || me.username)) : "Not signed in"
+    );
+    setText(
+      "fsBridgeQuoteInfo",
+      loadedQuote ? ("· Loaded " + loadedQuote.number + " (" + loadedQuote.status + ")") : ""
+    );
+  }
+
+  // -------- FS API helpers --------
+  function fsHeaders(extra) {
+    var h = { "Content-Type": "application/json" };
+    if (token) h["Authorization"] = "Bearer " + token;
+    if (extra) for (var k in extra) h[k] = extra[k];
+    return h;
+  }
+  function fsFetch(path, opts) {
+    opts = opts || {};
+    opts.headers = fsHeaders(opts.headers);
+    return fetch(FS + path, opts);
+  }
+
+  // -------- Auth --------
+  function signOut() {
+    try { localStorage.removeItem(TOKEN_KEY); } catch (e) {}
+    token = null; me = null;
+    render();
+  }
+  function openSignIn() {
+    setErr("fsBridgeSignInErr", "");
+    $("fsBridgeUser").value = "";
+    $("fsBridgePass").value = "";
+    openModal("fsBridgeSignInModal");
+    setTimeout(function () { $("fsBridgeUser").focus(); }, 50);
+  }
+  function closeSignIn() { closeModal("fsBridgeSignInModal"); }
+  function submitSignIn() {
+    var u = $("fsBridgeUser").value.trim();
+    var p = $("fsBridgePass").value;
+    if (!u || !p) { setErr("fsBridgeSignInErr", "Username and password required."); return; }
+    $("fsBridgeSignInGo").disabled = true;
+    fsFetch("/api/auth/login", { method: "POST", body: JSON.stringify({ username: u, password: p }) })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, body: d }; }); })
+      .then(function (res) {
+        if (!res.ok || !res.body.token) {
+          setErr("fsBridgeSignInErr", res.body.error || "Sign-in failed.");
+          return;
+        }
+        token = res.body.token;
+        try { localStorage.setItem(TOKEN_KEY, token); } catch (e) {}
+        return fetchMe();
+      })
+      .then(function () { if (me) { closeSignIn(); render(); loadCustomers(); } })
+      .catch(function (err) { setErr("fsBridgeSignInErr", String(err && err.message || err)); })
+      .finally(function () { $("fsBridgeSignInGo").disabled = false; });
+  }
+  function fetchMe() {
+    return fsFetch("/api/auth/me").then(function (r) {
+      if (r.status === 401) { signOut(); return null; }
+      if (!r.ok) throw new Error("auth/me " + r.status);
+      return r.json().then(function (data) { me = data; return data; });
+    });
+  }
+
+  // -------- Customers from FS --------
+  function loadCustomers() {
+    if (!token) return Promise.resolve();
+    return fsFetch("/api/customers?limit=500").then(function (r) {
+      if (!r.ok) return;
+      return r.json().then(function (rows) { customers = rows || []; });
+    });
+  }
+
+  // -------- Worksheet read (for Submit) --------
+  // Map the active page's rows into the {items:[], header} shape the FS
+  // /api/quotes POST expects. Each worksheet row contributes UP TO TWO items
+  // (labor + material) when either side has data.
+  function readWorksheet() {
+    var p = activePrefix();
+    var freeN = freeRowsFor(p);
+    var FIXED_LABOR = window.FIXED_LABOR || [];
+    var FIXED_MAT   = window.FIXED_MAT || [];
+    var sheetMu = n($(p + "_mkup") && $(p + "_mkup").value) || 1.33;
+
+    function readRow(idx, isFixed) {
+      var sfx = isFixed ? "f" + idx : "" + idx;
+      var laborDesc = isFixed ? (FIXED_LABOR[idx] || "") : (($(p + "_d_" + sfx) || {}).value || "");
+      var matDesc   = isFixed ? (FIXED_MAT[idx]   || "") : (($(p + "_m_" + sfx) || {}).value || "");
+      var h  = n($(p + "_h_"  + sfx) && $(p + "_h_"  + sfx).value);
+      var r  = n($(p + "_r_"  + sfx) && $(p + "_r_"  + sfx).value);
+      var q  = n($(p + "_q_"  + sfx) && $(p + "_q_"  + sfx).value);
+      var c  = n($(p + "_c_"  + sfx) && $(p + "_c_"  + sfx).value);
+      var mu = n($(p + "_mu_" + sfx) && $(p + "_mu_" + sfx).value);
+      var rowMu = mu > 0 ? mu : sheetMu;
+      var lineLaborTotal = h * r;
+      var lineMatSubtotal = q * c;
+      var lineMatSellTotal = lineMatSubtotal * rowMu;
+      return {
+        labor: (lineLaborTotal > 0 || laborDesc) ? {
+          kind: "labor",
+          description: laborDesc.trim() || "Labor",
+          qty: h, unitPrice: r, markupPct: 0, total: lineLaborTotal
+        } : null,
+        material: (lineMatSellTotal > 0 || matDesc) ? {
+          kind: "material",
+          description: matDesc.trim() || "Material",
+          qty: q, unitPrice: c, markupPct: rowMu - 1, total: lineMatSellTotal
+        } : null
+      };
+    }
+
+    var items = [];
+    for (var i = 0; i < freeN; i++) {
+      var row = readRow(i, false);
+      if (row.labor)    items.push(row.labor);
+      if (row.material) items.push(row.material);
+    }
+    for (var f = 0; f < 8; f++) {
+      var fr = readRow(f, true);
+      if (fr.labor)    items.push(fr.labor);
+      if (fr.material) items.push(fr.material);
+    }
+
+    return {
+      header: {
+        customerName: ($(p + "_cust") || {}).value || "",
+        projectName:  ($(p + "_proj") || {}).value || "",
+        jobNumber:    ($(p + "_jobnum") || {}).value || "",
+        estimator:    ($(p + "_estimator") || {}).value || "",
+      },
+      items: items,
+      subtotal: items.reduce(function (s, it) { return s + n(it.total); }, 0)
+    };
+  }
+
+  // -------- Submit flow --------
+  function openSubmit() {
+    setErr("fsBridgeSubmitErr", "");
+    var ws = readWorksheet();
+    var sel = $("fsBridgeCustomer");
+    sel.innerHTML = '<option value="">— Select —</option>';
+
+    // Pre-pick the customer whose name matches the worksheet's Customer field.
+    var hint = ws.header.customerName.trim().toLowerCase();
+    customers.forEach(function (c) {
+      var opt = document.createElement("option");
+      opt.value = c.id;
+      opt.textContent = c.name + (c.externalId ? " (" + c.externalId + ")" : "");
+      if (c.name.toLowerCase() === hint) opt.selected = true;
+      sel.appendChild(opt);
+    });
+
+    var subtotal = ws.subtotal;
+    $("fsBridgeSummary").innerHTML =
+      '<div><strong>Worksheet:</strong> ' + (ws.header.projectName || "(no project)") + ' · ' + (ws.header.jobNumber || "(no job number)") + '</div>' +
+      '<div><strong>Customer field:</strong> ' + (ws.header.customerName || "(empty)") + '</div>' +
+      '<div><strong>Line items:</strong> ' + ws.items.length + '</div>' +
+      '<div><strong>Subtotal:</strong> ' + fmt$(subtotal) + '</div>';
+    openModal("fsBridgeSubmitModal");
+  }
+  function closeSubmit() { closeModal("fsBridgeSubmitModal"); }
+  function confirmSubmit() {
+    var ws = readWorksheet();
+    var customerId = $("fsBridgeCustomer").value;
+    if (!customerId) { setErr("fsBridgeSubmitErr", "Pick a Field-Scheduler customer."); return; }
+    var noteParts = [];
+    if (ws.header.projectName) noteParts.push("Project: " + ws.header.projectName);
+    if (ws.header.jobNumber)   noteParts.push("Job#: " + ws.header.jobNumber);
+    if (ws.header.estimator)   noteParts.push("Estimator: " + ws.header.estimator);
+    var body = {
+      customerId: customerId,
+      notes: noteParts.join(" · ") || null,
+      taxRate: 0,
+      items: ws.items
+    };
+    $("fsBridgeSubmitGo").disabled = true;
+    fsFetch("/api/quotes", { method: "POST", body: JSON.stringify(body) })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, body: d }; }); })
+      .then(function (res) {
+        if (!res.ok) { setErr("fsBridgeSubmitErr", res.body.error || "Submit failed."); return; }
+        loadedQuote = { id: res.body.id, number: res.body.number, status: res.body.status };
+        closeSubmit();
+        render();
+        alert("Quote " + res.body.number + " created in Field-Scheduler.");
+      })
+      .catch(function (err) { setErr("fsBridgeSubmitErr", String(err && err.message || err)); })
+      .finally(function () { $("fsBridgeSubmitGo").disabled = false; });
+  }
+
+  // -------- Deep-link load --------
+  function loadQuote(qid) {
+    return fsFetch("/api/quotes/" + encodeURIComponent(qid))
+      .then(function (r) {
+        if (!r.ok) throw new Error("Failed to load quote " + qid);
+        return r.json();
+      })
+      .then(function (q) {
+        loadedQuote = q;
+        // Populate the active page's header fields with the loaded quote's customer.
+        var p = activePrefix();
+        if (q.customer && $(p + "_cust")) $(p + "_cust").value = q.customer.name || "";
+        if (q.notes && $(p + "_proj")) {
+          // Heuristic — if notes start with "Project: ...", extract the project name.
+          var m = (q.notes || "").match(/Project:\s*([^·]+?)(?:\s*·|$)/);
+          if (m && !$(p + "_proj").value) $(p + "_proj").value = m[1].trim();
+        }
+        // Populate line items by walking the labor side then material side and
+        // filling the free rows in order. Anything past the row count is
+        // dropped — the user can switch to the 2-page sheet for more capacity.
+        var labor = q.items.filter(function (it) { return it.kind === "labor"; });
+        var mat   = q.items.filter(function (it) { return it.kind === "material"; });
+        var freeN = freeRowsFor(p);
+        for (var i = 0; i < Math.min(labor.length, freeN); i++) {
+          var L = labor[i];
+          if ($(p + "_d_" + i)) $(p + "_d_" + i).value = L.description || "";
+          if ($(p + "_h_" + i)) $(p + "_h_" + i).value = L.qty;
+          if ($(p + "_r_" + i)) $(p + "_r_" + i).value = L.unitPrice;
+        }
+        for (var j = 0; j < Math.min(mat.length, freeN); j++) {
+          var M = mat[j];
+          if ($(p + "_m_" + j)) $(p + "_m_" + j).value = M.description || "";
+          if ($(p + "_q_" + j)) $(p + "_q_" + j).value = M.qty;
+          if ($(p + "_c_" + j)) $(p + "_c_" + j).value = M.unitPrice;
+          if ($(p + "_mu_" + j)) $(p + "_mu_" + j).value = (Number(M.markupPct) + 1).toFixed(2);
+        }
+        if (typeof recalcAll === "function") recalcAll(p, freeN);
+      });
+  }
+
+  // -------- Init --------
+  function init() {
+    fetch("/api/config").then(function (r) { return r.json(); })
+      .then(function (cfg) {
+        FS = (cfg && cfg.fs_api_url) ? cfg.fs_api_url.replace(/\/+$/, "") : null;
+        if (!FS) { render(); return; }
+        try { token = localStorage.getItem(TOKEN_KEY); } catch (e) { token = null; }
+        var maybeAuth = token ? fetchMe().catch(function () {}) : Promise.resolve();
+        return maybeAuth.then(function () {
+          render();
+          if (me) loadCustomers();
+          // Deep-link: ?quoteId=<id>
+          var params = new URLSearchParams(window.location.search);
+          var qid = params.get("quoteId");
+          if (qid && qid !== "new" && me) {
+            loadQuote(qid).catch(function (err) {
+              console.error("loadQuote failed", err);
+              alert("Could not load quote " + qid + ": " + (err && err.message || err));
+            });
+          }
+        });
+      })
+      .catch(function (err) {
+        console.warn("FS bridge config fetch failed:", err);
+      });
+  }
+
+  window.fsBridge = {
+    openSignIn: openSignIn,
+    closeSignIn: closeSignIn,
+    submitSignIn: submitSignIn,
+    openSubmit: openSubmit,
+    closeSubmit: closeSubmit,
+    confirmSubmit: confirmSubmit,
+    signOut: signOut
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();
+</script>
+
 </body>
 </html>

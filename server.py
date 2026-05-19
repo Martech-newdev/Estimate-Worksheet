@@ -22,6 +22,12 @@ from flask import Flask, Response, jsonify, request, send_from_directory
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DATABASE_URL = os.environ["DATABASE_URL"]
 
+# Optional bridge to a sibling Field-Scheduler deployment. When set, the
+# worksheet's client-side JS will offer a "Sign in" + "Submit to Field-Scheduler"
+# workflow that posts the current worksheet as a quote into the Field-Scheduler
+# database. Unset means the worksheet runs in its current standalone mode.
+FIELD_SCHEDULER_URL = (os.environ.get("FIELD_SCHEDULER_URL") or "").rstrip("/")
+
 ALLOWED_KEYS = {
     "defaults": {},
     "defaults_counter": 0,
@@ -109,6 +115,20 @@ def _no_cache(resp: Response) -> Response:
     resp.headers["Pragma"] = "no-cache"
     resp.headers["Expires"] = "0"
     return resp
+
+
+@app.route("/api/config", methods=["GET"])
+def get_config() -> Response:
+    """Front-end discovery endpoint for the Field-Scheduler bridge.
+
+    Returns the configured Field-Scheduler API base URL (or empty string when
+    no bridge is configured). The worksheet's JS reads this once on page load
+    and decides whether to show the Sign-In + Submit-to-FS UI.
+    """
+    return jsonify({
+        "fs_api_url": FIELD_SCHEDULER_URL,
+        "bridge_enabled": bool(FIELD_SCHEDULER_URL),
+    })
 
 
 @app.route("/api/store", methods=["GET"])
